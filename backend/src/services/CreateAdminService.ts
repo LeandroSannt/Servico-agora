@@ -11,18 +11,18 @@ interface Request{
 }
 
 class CreateAdminService{
-  public async execute({name,password}:Request):Promise<void>{
-      const adminRepository = getRepository(Admin)
+  public async execute({name,email,password}:Request):Promise<Admin>{
+      const adminsRepository = getRepository(Admin)
 
       const hashedPassword = await hash(password,8)
 
-      const admin = adminRepository.create({
+      const admin = adminsRepository.create({
         name,
         email,
-        password
+        password:hashedPassword
       })
 
-      await admin.save(admin)
+      await adminsRepository.save(admin)
 
       return admin
 

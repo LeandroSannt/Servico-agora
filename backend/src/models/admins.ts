@@ -2,13 +2,19 @@ import {Entity, Column, PrimaryGeneratedColumn,CreateDateColumn,UpdateDateColumn
 
 import Store from './stores'
 
-@Entity('admins')
+@Entity('admin')
 class Admin{
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column()
   name: string;
+
+  @Column()
+  password: string;
+
+  @Column()
+  email: string;
 
   @CreateDateColumn()
   created_at: Date
@@ -20,7 +26,7 @@ class Admin{
   @JoinColumn({name:'admin_id'})
   store:Store
 
-w
+
 }
 
 export default Admin
