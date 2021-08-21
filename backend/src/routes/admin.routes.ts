@@ -5,7 +5,7 @@ const adminRouter = Router()
 
 const adminController = new AdminController()
 
-adminRouter.use('/',adminController.post)
+adminRouter.post('/',adminController.post)
 
 export default adminRouter
 
