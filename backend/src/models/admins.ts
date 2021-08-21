@@ -24,7 +24,7 @@ class Admin{
 
   @OneToMany(() => Store,(store) => store.id)
   @JoinColumn({name:'admin_id'})
-  store:Store
+  admni:Store
 
 
 }

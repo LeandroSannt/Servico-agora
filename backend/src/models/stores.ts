@@ -13,12 +13,6 @@ class Store{
   @Column()
   cpf_cnpj: string;
 
-
-
-  // @OneToMany(() => Admin,(admin) => admin.id)
-  // @JoinColumn({name:'admin_id'})
-  // admin:Admin
-
   @ManyToOne(() => Admin)
   @JoinColumn({name:'admin_id'})
   admin:Admin
