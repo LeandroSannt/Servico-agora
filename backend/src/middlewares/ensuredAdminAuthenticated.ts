@@ -28,6 +28,7 @@ export default function ensuredAdminAuthenticated(request:Request,response:Respo
     id :sub
   }
 
+
   return next()
 
   }catch{

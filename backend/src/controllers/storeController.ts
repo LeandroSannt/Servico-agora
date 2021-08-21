@@ -7,7 +7,7 @@ import Store from '../models/stores'
 
 class StoreController {
   async post(request: Request, response: Response){
-    const {name,telephone,cpf_cnpj,cep,city,address,complement,avatar_store} = request.body
+    const {name,telephone,cpf_cnpj,cep,city,address,complement,avatar_store,admin_id} = request.body
 
     const createStore = new CreateStoreService()
 
@@ -19,7 +19,8 @@ class StoreController {
       city,
       address,
       complement,
-      avatar_store
+      avatar_store,
+      admin_id:  request.admin.id
     })
 
     return response.json(store)

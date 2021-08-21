@@ -12,10 +12,11 @@ interface Request{
   city: string;
   address: string;
   complement?: string;
+  admin_id?:string
 }
 
 class CreateStoreService{
-  public async execute({name,cpf_cnpj,telephone,avatar_store,cep,city,address,complement}:Request):Promise<Store>{
+  public async execute({name,cpf_cnpj,telephone,avatar_store,cep,city,address,complement,admin_id}:Request):Promise<Store>{
   const storesRepository = getCustomRepository(StoresRepository)
 
   const findCpf_cnpj = await storesRepository.findBy(
@@ -34,7 +35,8 @@ class CreateStoreService{
     cep,
     city,
     address,
-    complement
+    complement,
+    admin_id
   })
 
   await storesRepository.save(store)

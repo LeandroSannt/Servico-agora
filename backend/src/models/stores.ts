@@ -18,6 +18,9 @@ class Store{
   admin:Admin
 
   @Column()
+  admin_id:string
+
+  @Column()
   telephone: string;
 
   @Column({unique:true})
