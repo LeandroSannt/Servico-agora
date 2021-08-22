@@ -19,7 +19,7 @@ class StoreController {
       city,
       address,
       complement,
-      avatar_store,
+      avatar_store:request.file.filename,
       admin_id:  request.admin.id
     })
 

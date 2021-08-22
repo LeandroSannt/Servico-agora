@@ -1,6 +1,11 @@
 import Store from '../models/stores'
 import {StoresRepository} from '../repositories/StoresRepository'
 
+import uploadConfig from '../config/upload'
+import path from 'path'
+
+import fs from 'fs'
+
 import {getCustomRepository} from 'typeorm'
 
 interface Request{
@@ -25,6 +30,14 @@ class CreateStoreService{
 
   if(findCpf_cnpj) {
     throw new Error("Cpf ou cnpj ja cadastrado")
+  }
+
+
+  const userAvatarFilePath = path.join(uploadConfig.directory,avatar_store)
+  const userAvatarFileExists = await fs.promises.stat(userAvatarFilePath)
+
+  if(userAvatarFileExists){
+    await fs.promises.unlink(userAvatarFilePath)
   }
 
   const store = storesRepository.create({
