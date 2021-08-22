@@ -12,7 +12,13 @@ class User{
   name: string;
 
   @Column()
-  cpf: string;
+  email: string;
+
+  @Column()
+  password: string;
+
+  @Column()
+  avatar: string;
 
   @ManyToOne(() => Store)
   @JoinColumn({name:'store_id'})
@@ -27,9 +33,6 @@ class User{
 
   @Column()
   profile_id:string
-
-  @Column()
-  avatar: string;
 
   @CreateDateColumn()
   created_at: Date

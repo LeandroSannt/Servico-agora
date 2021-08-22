@@ -25,11 +25,11 @@ export class CreateUser1629551831045 implements MigrationInterface {
             type:'varchar',
             isNullable:false
           },
+
           {
-            name:'cpf',
+            name:'password',
             type:'varchar',
             isNullable:false
-
           },
 
           {

@@ -7,5 +7,7 @@ const adminController = new AdminController()
 
 adminRouter.post('/',adminController.post)
 
+adminRouter.post('/create-user-store',adminController.createUserStore)
+
 export default adminRouter
 
