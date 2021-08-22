@@ -1,7 +1,9 @@
 import {Request, Response} from 'express';
 import { getCustomRepository, getRepository } from 'typeorm';
 import { CreateAdminService } from '../services/CreateAdminService';
-import { CreateUserService } from '../services/CreateUserService';
+import { CreateUserService } from '../services/AdminCreateUserService';
+
+
 
 class AdminController{
   async post(request: Request, response: Response){
@@ -32,7 +34,9 @@ class AdminController{
       profile_id
     })
 
-    return response.json(user)
+    delete user.password
+
+    return response.json({user,success:`A senha foi enviada para o email: ${email}`})
 
   }
 
