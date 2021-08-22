@@ -5,6 +5,10 @@ declare namespace Express {
     },
     user:{
       id:string
+      email:string
+      store_id:string
+      profile_id: string
+
     }
   }
 }

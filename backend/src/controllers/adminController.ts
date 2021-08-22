@@ -4,7 +4,6 @@ import { CreateAdminService } from '../services/CreateAdminService';
 import { CreateUserService } from '../services/AdminCreateUserService';
 
 
-
 class AdminController{
   async post(request: Request, response: Response){
     const {name,email,password} = request.body
