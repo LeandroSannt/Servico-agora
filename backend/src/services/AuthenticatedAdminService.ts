@@ -1,6 +1,8 @@
 import {getRepository} from 'typeorm'
 import Admin from '../models/admins'
 import authconfig from '../config/auth'
+import AppError from '../errors/AppErros'
+
 
 import {sign} from 'jsonwebtoken'
 import {compare} from 'bcryptjs'
@@ -22,7 +24,7 @@ class AuthenticationAdminService{
     const admin = await adminRepository.findOne({where:{email}})
 
     if(!admin){
-      throw new Error("admin not found")
+      throw new AppError("admin not found",404)
     }
 
     const passwordmatcher = await compare(password,admin.password)

@@ -1,6 +1,8 @@
 import {getCustomRepository} from 'typeorm'
 import {UserRepository} from '../repositories/UserRepository'
 import User from '../models/users'
+import AppError from '../errors/AppErros'
+
 
 interface Request{
   name:string;
@@ -19,7 +21,7 @@ class CreateUserService{
       const findEmail = await userRepository.findBy(email)
 
       if(findEmail){
-        throw new Error('Email ja cadatrado')
+        throw new AppError('Email ja cadatrado')
       }
 
       const user = userRepository.create({

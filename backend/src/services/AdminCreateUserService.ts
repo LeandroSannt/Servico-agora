@@ -1,6 +1,7 @@
 import {getCustomRepository} from 'typeorm'
 import {UserRepository} from '../repositories/UserRepository'
 import User from '../models/users'
+import AppError from '../errors/AppErros'
 
 import mailer from '../config/mailer'
 
@@ -25,7 +26,7 @@ class CreateUserService{
       const findEmail = await userRepository.findBy(email)
 
       if(findEmail){
-        throw new Error('Email ja cadatrado')
+        throw new AppError('Email ja cadatrado',401)
       }
 
       const newPassword = crypt.randomBytes(8).toString("hex");

@@ -1,4 +1,5 @@
 import Profile from '../models/profiles'
+import AppError from '../errors/AppErros'
 
 import {getCustomRepository} from 'typeorm'
 import { ProfilesRepository } from '../repositories/ProfilesRepository'
@@ -17,7 +18,7 @@ class CreateProfileService{
   )
 
   if(findName) {
-    throw new Error("Perfil ja cadastrado")
+    throw new AppError("Perfil ja cadastrado")
   }
 
   const profile = profilesRepository.create({

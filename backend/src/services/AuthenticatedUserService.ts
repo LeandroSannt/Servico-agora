@@ -1,6 +1,8 @@
 import {getRepository} from 'typeorm'
 import User from '../models/users'
 import authconfig from '../config/auth'
+import AppError from '../errors/AppErros'
+
 
 import {sign} from 'jsonwebtoken'
 import {compare} from 'bcryptjs'
@@ -22,13 +24,13 @@ class AuthenticationUserService{
     const user = await userRepository.findOne({where:{email}})
 
     if(!user){
-      throw new Error("admin not found")
+      throw new AppError("admin not found",404)
     }
 
     const passwordmatcher = await compare(password,user.password)
 
     if(!passwordmatcher){
-      throw new Error('Incorrect email/password combination')
+      throw new AppError('Incorrect email/password combination')
     }
 
     const token = sign({},authconfig.jwt.secret,{

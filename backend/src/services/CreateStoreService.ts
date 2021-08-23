@@ -1,5 +1,6 @@
 import Store from '../models/stores'
 import {StoresRepository} from '../repositories/StoresRepository'
+import AppError from '../errors/AppErros'
 
 import uploadConfig from '../config/upload'
 import path from 'path'
@@ -29,15 +30,7 @@ class CreateStoreService{
   )
 
   if(findCpf_cnpj) {
-    throw new Error("Cpf ou cnpj ja cadastrado")
-  }
-
-
-  const userAvatarFilePath = path.join(uploadConfig.directory,avatar_store)
-  const userAvatarFileExists = await fs.promises.stat(userAvatarFilePath)
-
-  if(userAvatarFileExists){
-    await fs.promises.unlink(userAvatarFilePath)
+    throw new AppError("Cpf ou cnpj ja cadastrado",401)
   }
 
   const store = storesRepository.create({
