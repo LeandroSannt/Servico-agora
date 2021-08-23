@@ -1,20 +1,17 @@
 import {Router} from 'express'
 import storesRouter from './stores.routes'
 import adminRouter from './admin.routes'
-import sessionAdminRouter from './sessionAdmin.routes'
-import sessionUserRouter from './sessionUser.routes'
+import sessionRouter from './session.routes'
 import profileRouter from './profile.routes'
 
 
 //middlewares
-import authAdmin from '../middlewares/ensuredAdminAuthenticated'
-import authUser from '../middlewares/ensuredUserAuthenticated'
+import {authAdmin, AuthUser} from '../middlewares/ensuredAuthenticated'
 
 const routes = Router()
 
 //sessions
-routes.use('/session/admin',sessionAdminRouter)
-routes.use("/session/user",sessionUserRouter)
+routes.use('/session',sessionRouter)
 
 //routes system
 routes.use('/admin',adminRouter)

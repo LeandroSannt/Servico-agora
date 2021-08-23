@@ -9,7 +9,34 @@ interface tokenPayload{
   sub:string
 }
 
-export default function ensuredUserAuthenticated(request:Request,response:Response,next:NextFunction): void{
+function authAdmin(request:Request,response:Response,next:NextFunction): void{
+
+  const authHeader = request.headers.authorization
+
+  if(!authHeader){
+    throw new Error('JWT is missing')
+  }
+
+  const [,token] = authHeader.split(' ')
+
+  try{
+  const decoded = verify(token, authconfig.jwt.secret)
+
+  const { sub } = decoded as tokenPayload
+
+  request.admin = {
+    id :sub
+  }
+
+
+  return next()
+
+  }catch{
+    throw new Error('Invalid JWT token')
+  }
+}
+
+ function AuthUser(request:Request,response:Response,next:NextFunction): void{
 
   const authHeader = request.headers.authorization
 
@@ -37,3 +64,5 @@ export default function ensuredUserAuthenticated(request:Request,response:Respon
     throw new Error('Invalid JWT token')
   }
 }
+
+export {authAdmin,AuthUser}

@@ -5,7 +5,7 @@ const sessionUserRouter = Router()
 
 const sessionUserController = new SessionUserController()
 
-sessionUserRouter.post('/login', sessionUserController.post)
+sessionUserRouter.post('/admin/login', sessionUserController.post)
 
 
 export default sessionUserRouter

@@ -3,9 +3,9 @@ import Admin from '../models/admins'
 import authconfig from '../config/auth'
 import AppError from '../errors/AppErros'
 
-
 import {sign} from 'jsonwebtoken'
 import {compare} from 'bcryptjs'
+import User from '../models/users'
 
 interface Request{
   email: string
@@ -17,7 +17,13 @@ interface Response {
   token:string
 }
 
-class AuthenticationAdminService{
+interface ResponseUser{
+  user:User;
+  token:string;
+
+}
+
+class AuthenticationService{
   public async execute({email,password}:Request):Promise<Response>{
     const adminRepository = getRepository(Admin)
 
@@ -45,8 +51,33 @@ class AuthenticationAdminService{
 
   }
 
+  public async authUser({email,password}:Request):Promise<ResponseUser>{
+     const userRepository = getRepository(User)
+
+    const user = await userRepository.findOne({where:{email}})
+
+    if(!user){
+      throw new AppError("admin not found",404)
+    }
+
+    const passwordmatcher = await compare(password,user.password)
+
+    if(!passwordmatcher){
+      throw new AppError('Incorrect email/password combination')
+    }
+
+    const token = sign({},authconfig.jwt.secret,{
+      subject:user.id,
+      expiresIn:authconfig.jwt.expiresIn
+    })
+
+    return {
+      user,
+      token
+    }
+  }
 }
 
-export default AuthenticationAdminService
+export default AuthenticationService
 
 
