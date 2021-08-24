@@ -1,5 +1,7 @@
 import {Request,Response,NextFunction} from 'express'
 import {verify} from 'jsonwebtoken'
+import AppError from '../errors/AppErros'
+
 
 import authconfig from '../config/auth'
 
@@ -14,7 +16,7 @@ function authAdmin(request:Request,response:Response,next:NextFunction): void{
   const authHeader = request.headers.authorization
 
   if(!authHeader){
-    throw new Error('JWT is missing')
+    throw new AppError('JWT is missing')
   }
 
   const [,token] = authHeader.split(' ')
@@ -25,6 +27,8 @@ function authAdmin(request:Request,response:Response,next:NextFunction): void{
   const { sub } = decoded as tokenPayload
 
   request.admin = {
+    permissions:sub,
+    email:sub,
     id :sub
   }
 
@@ -41,7 +45,7 @@ function authAdmin(request:Request,response:Response,next:NextFunction): void{
   const authHeader = request.headers.authorization
 
   if(!authHeader){
-    throw new Error('JWT is missing')
+    throw new AppError('JWT is missing')
   }
 
   const [,token] = authHeader.split(' ')
@@ -53,9 +57,7 @@ function authAdmin(request:Request,response:Response,next:NextFunction): void{
 
   request.user = {
     id :sub,
-    email:sub,
-    store_id:sub,
-    profile_id:sub
+    //email:sub
   }
 
   return next()

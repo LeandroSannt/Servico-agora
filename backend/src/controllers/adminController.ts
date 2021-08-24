@@ -1,14 +1,12 @@
 import {Request, Response} from 'express';
-import { getCustomRepository, getRepository } from 'typeorm';
-import { CreateAdminService } from '../services/CreateAdminService';
-import { CreateUserService } from '../services/AdminCreateUserService';
+import { AdminService } from '../services/AdminServices';
 
 
 class AdminController{
   async post(request: Request, response: Response){
     const {name,email,password} = request.body
 
-    const createAdmin = new CreateAdminService()
+    const createAdmin = new AdminService()
 
     const admin = await createAdmin.execute({
       name,
@@ -22,9 +20,9 @@ class AdminController{
   async createUserStore(request: Request, response: Response){
     const {name,email,password,avatar,store_id,profile_id} = request.body
 
-    const createUser = new CreateUserService()
+    const createUser = new AdminService()
 
-    const user = await createUser.execute({
+    const user = await createUser.adminCreateUser({
       name,
       email,
       password,

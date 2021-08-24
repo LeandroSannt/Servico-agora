@@ -26,6 +26,8 @@ class Admin{
   @JoinColumn({name:'admin_id'})
   admni:Store
 
+  @Column()
+  permissions: string;
 
 }
 

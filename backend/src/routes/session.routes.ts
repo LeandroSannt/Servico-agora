@@ -1,6 +1,9 @@
 import {Router} from 'express'
 import { SessionController } from '../controllers/sessionController'
 
+import { UnauthorizedUser } from '../middlewares/UnauthorizedUser'
+
+
 const sessionsRouter = Router()
 
 const sessionController = new SessionController()
