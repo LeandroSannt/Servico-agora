@@ -21,7 +21,7 @@ interface Request{
   admin_id?:string
 }
 
-class CreateStoreService{
+class StoreService{
   public async execute({name,cpf_cnpj,telephone,avatar_store,cep,city,address,complement,admin_id}:Request):Promise<Store>{
   const storesRepository = getCustomRepository(StoresRepository)
 
@@ -53,4 +53,4 @@ class CreateStoreService{
 
 }
 
-export {CreateStoreService}
+export {StoreService}

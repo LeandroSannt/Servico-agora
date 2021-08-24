@@ -1,7 +1,7 @@
 import {Request, Response} from 'express';
 import { getCustomRepository, getRepository } from 'typeorm';
 import { StoresRepository } from '../repositories/StoresRepository';
-import {CreateStoreService} from '../services/CreateStoreService'
+import {StoreService} from '../services/StoreService'
 import Store from '../models/stores'
 
 
@@ -9,7 +9,7 @@ class StoreController {
   async post(request: Request, response: Response){
     const {name,telephone,cpf_cnpj,cep,city,address,complement,avatar_store,admin_id} = request.body
 
-    const createStore = new CreateStoreService()
+    const createStore = new StoreService()
 
     const store = await createStore.execute({
       name,

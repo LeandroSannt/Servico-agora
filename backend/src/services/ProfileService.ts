@@ -9,7 +9,7 @@ interface Request{
   ativo:boolean;
 }
 
-class CreateProfileService{
+class ProfileService{
   public async execute({name,ativo}:Request):Promise<Profile>{
   const profilesRepository = getCustomRepository(ProfilesRepository)
 
@@ -34,4 +34,4 @@ class CreateProfileService{
 
 }
 
-export {CreateProfileService}
+export {ProfileService}

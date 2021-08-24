@@ -14,7 +14,6 @@ export async function UnauthorizedUser(
   const adminRepositories = getRepository(User)
 
   const isadmin = await adminRepositories.findOne(user);
-  console.log(isadmin)
 
   if(!isadmin){
     return next()

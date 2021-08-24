@@ -1,7 +1,7 @@
 import {Request, Response} from 'express';
 import { getCustomRepository, getRepository } from 'typeorm';
 import { ProfilesRepository } from '../repositories/ProfilesRepository';
-import {CreateProfileService} from '../services/CreateProfileService'
+import {ProfileService} from '../services/ProfileService'
 import Profile from '../models/profiles'
 
 
@@ -9,7 +9,7 @@ class ProfileController {
   async post(request: Request, response: Response){
     const {name,ativo} = request.body
 
-    const createProfile = new CreateProfileService()
+    const createProfile = new ProfileService()
 
     const profile = await createProfile.execute({
       name,
