@@ -36,17 +36,20 @@ class ProfileController {
   }
 
   async update(request: Request, response: Response){
-    const {id} = request.params
 
-    await getRepository(Profile).update(id,request.body)
+    const updateProfile = new ProfileService()
 
-    const updateProfile = await getRepository(Profile).findOne(id)
+    //const profile = await updateProfile.executeUpdate({})
 
-    if(!updateProfile){
-      throw new Error("Perfil não foi encontrada")
-    }
+    // await getRepository(Profile).update(id,request.body)
 
-    return response.json(updateProfile)
+    // const updateProfile = await getRepository(Profile).findOne(id)
+
+    // if(!updateProfile){
+    //   throw new Error("Perfil não foi encontrada")
+    // }
+
+    // return response.json(updateProfile)
   }
 
   async delete(request: Request, response: Response){

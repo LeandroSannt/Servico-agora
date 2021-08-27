@@ -9,6 +9,13 @@ interface Request{
   ativo:boolean;
 }
 
+interface RequestUpdate{
+  id:string;
+  name: string;
+  ativo:boolean;
+}
+
+
 class ProfileService{
   public async execute({name,ativo}:Request):Promise<Profile>{
   const profilesRepository = getCustomRepository(ProfilesRepository)
@@ -32,6 +39,20 @@ class ProfileService{
 
   }
 
+  public async executeUpdate({id,name,ativo}:RequestUpdate):Promise<Profile>{
+    const profilesRepository = getCustomRepository(ProfilesRepository)
+
+    const findProfile = await profilesRepository.findOne(id)
+
+    if(!findProfile){
+      throw new AppError("Perfil não encontrado",404)
+    }
+
+    profilesRepository.save(findProfile)
+
+    return findProfile
+
+  }
 }
 
 export {ProfileService}
