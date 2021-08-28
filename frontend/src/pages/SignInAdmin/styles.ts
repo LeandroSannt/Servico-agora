@@ -25,8 +25,7 @@ export const Content = styled.div`
   div{
     max-width:85%;
     div{
-      margin-bottom: .8rem;
-      max-width: 90%;
+      max-width: 100%;
 
         h1{
           margin-bottom: .8rem;
@@ -60,24 +59,7 @@ export const Content = styled.div`
     display: flex;
     flex-direction: column;
 
-    input{
-      background: #232129 ;
-      border-radius: 4px;
-      border:1px solid #898080;
-      padding: 18px;
-      width: 100%;
-      font-size: 1.8rem;
-      
-      display: flex;
-      align-items: center;
-
-      flex: 1;
-      background: transparent !important;
-
-      & + input {
-        margin-top: 20px;
-      }
-    }
+   
 
     button{
       background: #240669 ;

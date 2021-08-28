@@ -1,10 +1,14 @@
-import React from 'react'
+import React, {useCallback,useRef,useContext}  from 'react';
 import {Container,Content,Background} from './styles'
-
+import {Form} from "@unform/web"
 import logo from '../../assets/logo.png'
 
 
 const SignInUser: React.FC = () => {
+  const handleSubmit = useCallback(async(data:void) =>{
+    console.log("oi")
+
+  }, [])
 
 
   return (
@@ -19,12 +23,12 @@ const SignInUser: React.FC = () => {
             <h1>Login</h1>
             <p>Preencha suas credencias corretamentes para realizar seu acesso</p>
           </div>
-          <form>
+          <Form onSubmit={handleSubmit}>
             <input type="text" placeholder="USUÁRIO"/>
             <input type="password" placeholder="SENHA"/>
           
             <button type="submit">Entrar</button>
-          </form>
+          </Form>
             <p>Problemas com o acesso.<span>clique aqui!</span></p>
         </div>
       </Content>
