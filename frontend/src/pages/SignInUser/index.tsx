@@ -6,7 +6,7 @@ import logo from '../../assets/logo.png'
 
 const SignInUser: React.FC = () => {
   const handleSubmit = useCallback(async(data:void) =>{
-    console.log("oi")
+    
 
   }, [])
 

@@ -1,8 +1,10 @@
 import React, {InputHTMLAttributes,useCallback,useRef,useContext,useEffect,useState} from 'react';
 import {Container,Content,Background} from './styles'
 import Input from '../../components/Input'
+import Button from '../../components/Button'
 
 import {FiLogIn,FiMail,FiLock} from 'react-icons/fi'
+import { TiArrowRight } from "react-icons/ti";
 
 
 import {Form} from "@unform/web"
@@ -32,11 +34,7 @@ const SignInAdmin: React.FC = () => {
 
   }, [])
 
-
-
-
   return (
-    <>
     <>
     <Container>
       <Background></Background>
@@ -51,13 +49,12 @@ const SignInAdmin: React.FC = () => {
           <Form onSubmit={handleSubmit}>
             <Input  name="email" icon={FiMail} type="text" placeholder="USUÁRIO"/>
             <Input  name="password" icon={FiLock} type="password" placeholder="SENHA"/>
-            <button type="submit">Entrar</button>
+            <Button type="submit" icon={TiArrowRight}>Entrar </Button>
           </Form>
             <p>Problemas com o acesso.<span>clique aqui!</span></p>
         </div>
       </Content>
     </Container>
-    </>
     </>
   )
 }

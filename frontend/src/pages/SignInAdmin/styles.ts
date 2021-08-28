@@ -60,25 +60,7 @@ export const Content = styled.div`
     flex-direction: column;
 
    
-
-    button{
-      background: #240669 ;
-      height: 56px;
-      border-radius: 10px;
-      border:0;
-      color: white;
-      font-weight: 500;
-      font-size: 1.8rem;
-      padding:0 16px;
-      width: 100%;
-      margin-top: 16px;
-      transition:background-color 0.2s;
-      text-align: center;
-
-      &:hover{
-          background: ${shade(0.2, '#240669')};
-        }
-    }
+    
   }
 
 `
