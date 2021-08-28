@@ -23,7 +23,7 @@ body{
 }
 
 body,input,button{
-    font-family: 'Roboto Slab', serif;
+    font-family: 'Roboto', sans-serif;
     font: 1.6rem;
     font-weight: normal;
 }
