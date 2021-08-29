@@ -3,13 +3,18 @@ import SignInUser from './pages/SignInUser';
 import SignInAdmin from './pages/SignInAdmin';
 import GlobalStyle  from './styles/Global';
 
+import {AuthProvider} from './context/AuthContext';
 
 function App() {
   return (
     <>
-    <GlobalStyle/>
-    <SignInAdmin/>
-    {/* <SignInUser/> */}
+    <AuthProvider>
+
+    <SignInUser/>
+    {/* <SignInAdmin/> */}
+    </AuthProvider>
+
+      <GlobalStyle/>
      
     </>
   );

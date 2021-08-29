@@ -1,6 +1,5 @@
 import styled from 'styled-components'
 import bikeimage from '../../assets/imgadm.jpg'
-
 import {shade} from 'polished'
 
 export const Container = styled.div`
@@ -26,8 +25,7 @@ export const Content = styled.div`
   div{
     max-width:85%;
     div{
-      margin-bottom: .8rem;
-      max-width: 90%;
+      max-width: 100%;
 
         h1{
           margin-bottom: .8rem;
@@ -61,43 +59,8 @@ export const Content = styled.div`
     display: flex;
     flex-direction: column;
 
-    input{
-      background: #232129 ;
-      border-radius: 4px;
-      border:1px solid #898080;
-      padding: 18px;
-      width: 100%;
-      font-size: 1.8rem;
-      
-      display: flex;
-      align-items: center;
-
-      flex: 1;
-      background: transparent !important;
-
-      & + input {
-        margin-top: 20px;
-      }
-    }
-
-    button{
-      background: #240669 ;
-      height: 56px;
-      border-radius: 10px;
-      border:0;
-      color: white;
-      font-weight: 500;
-      font-size: 1.8rem;
-      padding:0 16px;
-      width: 100%;
-      margin-top: 16px;
-      transition:background-color 0.2s;
-      text-align: center;
-
-      &:hover{
-          background: ${shade(0.2, '#240669')};
-        }
-    }
+   
+    
   }
 
 `

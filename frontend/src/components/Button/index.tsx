@@ -1,26 +1,11 @@
-import React, {ButtonHTMLAttributes} from 'react';
-import {Container} from './styles';
-import {IconBaseProps} from 'react-icons'
+import React,{ButtonHTMLAttributes} from 'react';
+import {Container} from './styles'
 
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement>
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLInputElement> {
+const Button: React.FC<ButtonProps> = ({children, ...rest}) => (
 
-  icon?: React.ComponentType<IconBaseProps>;
-}
-
-const Button: React.FC<ButtonProps>= ({children, icon:Icon,...rest}) => {
-
-  return (
-    <>
-    <Container  type="button" {...rest}>
-      {children}
-
-      {Icon &&  <Icon size={20}/>}
-    </Container>
-    </>
-    
-  )
-
-}
+  <Container type="button" {...rest}>{children}</Container>
+)
 
 export default Button

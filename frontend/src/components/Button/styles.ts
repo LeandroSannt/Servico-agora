@@ -1,9 +1,7 @@
 import styled from "styled-components";
 import {shade} from 'polished'
 
-export const Container = styled.div`
-
-
+export const Container = styled.button`
       background: #240669 ;
       height: 56px;
       border-radius: 10px;
@@ -22,13 +20,17 @@ export const Container = styled.div`
       align-items: center;
       justify-content: center;
 
-       svg {
+       /* svg {
          margin-left: 5px;
-       }
+       } */
 
       &:hover{
           background: ${shade(0.2, '#240669')};
         }
     
 
+
+
 `
+
+
