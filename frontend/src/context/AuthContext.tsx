@@ -8,7 +8,7 @@ interface SignInCredentials{
 }
 
 interface AuthContextState{
-  name:string;
+
   signIn(credentials:SignInCredentials):Promise<void>;
   signInUser(credentials:SignInCredentials):Promise<void>;
 }
@@ -37,7 +37,7 @@ const AuthProvider:React.FC = ({children}) => {
   }, [])
 
   return (
-    <AuthContext.Provider value ={{name:"leandro",signInUser, signIn}}>
+    <AuthContext.Provider value ={{signInUser, signIn}}>
      {children}
      </AuthContext.Provider>
   )
