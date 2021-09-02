@@ -11,10 +11,12 @@
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.2",
+    "@types/cors": "^2.8.12",
     "@types/jsonwebtoken": "^8.5.4",
     "@types/nodemailer": "^6.4.4",
     "bcryptjs": "^2.4.3",
     "class-validator": "^0.13.1",
+    "cors": "^2.8.5",
     "date-fns": "^2.22.1",
     "express": "^4.17.1",
     "express-async-error": "^0.0.2",
