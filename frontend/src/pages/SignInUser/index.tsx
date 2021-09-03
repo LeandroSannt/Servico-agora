@@ -5,7 +5,7 @@ import Input from '../../components/Input'
 import Button from '../../components/Button'
 import logo from '../../assets/logo.png'
 
-import {AuthContext} from '../../context/AuthContext';
+import {AuthContext} from '../../hooks/AuthContext';
 
 import getValidationErrors from '../../utils/getValidationErros'
 

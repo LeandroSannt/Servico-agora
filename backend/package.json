@@ -14,6 +14,7 @@
     "@types/cors": "^2.8.12",
     "@types/jsonwebtoken": "^8.5.4",
     "@types/nodemailer": "^6.4.4",
+    "@types/uuid": "^8.3.1",
     "bcryptjs": "^2.4.3",
     "class-validator": "^0.13.1",
     "cors": "^2.8.5",
@@ -27,6 +28,7 @@
     "pg": "^8.6.0",
     "reflect-metadata": "^0.1.13",
     "typeorm": "^0.2.34",
+    "uuid": "^8.3.2",
     "uuidv4": "^6.2.11"
   },
   "devDependencies": {
