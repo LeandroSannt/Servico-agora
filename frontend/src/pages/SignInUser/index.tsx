@@ -6,6 +6,7 @@ import Button from '../../components/Button'
 import logo from '../../assets/logo.png'
 
 import {AuthContext} from '../../hooks/AuthContext';
+import {useToast} from '../../hooks/ToastContext';
 
 import getValidationErrors from '../../utils/getValidationErros'
 
@@ -27,6 +28,7 @@ const SignInAdmin: React.FC = () => {
   const formRef= useRef<FormHandles>(null)
 
   const {signInUser} = useContext(AuthContext)
+  const {addToast}  = useToast()
 
 //função para validar os campos do formulario
  const handleSubmit= useCallback(async(data:SignInFormData) =>{
@@ -47,10 +49,18 @@ const SignInAdmin: React.FC = () => {
         password:data.password
       })
     }catch(err){
-      const errors = getValidationErrors(err)
-      formRef.current?.setErrors(errors);
+      if(err instanceof Yup.ValidationError){
+        const errors = getValidationErrors(err)
+        formRef.current?.setErrors(errors);
+      }
+
+      addToast({
+        title:'Erro na autenticação',
+        type:'error',
+        description:'ocorreu um erro ao fazer login, cheque as credenciais'
+      })
     }
-  },[signInUser])
+  },[addToast,signInUser])
 
  
   return (
