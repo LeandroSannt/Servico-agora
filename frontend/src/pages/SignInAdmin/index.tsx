@@ -1,10 +1,10 @@
-import React, {useCallback,useRef,useContext} from 'react';
+import React, {useCallback,useRef} from 'react';
 import {Container,Content,Background} from './styles'
 import {FiMail,FiLock} from 'react-icons/fi'
 import Input from '../../components/Input'
 import Button from '../../components/Button'
 
-import {AuthContext} from '../../hooks/AuthContext';
+import {useAuth} from '../../hooks/AuthContext';
 import {useToast} from '../../hooks/ToastContext';
 
 import getValidationErrors from '../../utils/getValidationErros'
@@ -13,7 +13,6 @@ import {Form} from "@unform/web"
 import {FormHandles} from '@unform/core'
 
 import * as Yup from 'yup'
-
 
 
 interface SignInFormData{
@@ -28,7 +27,7 @@ const SignInAdmin: React.FC = () => {
 
   const formRef= useRef<FormHandles>(null)
 
-  const {signIn} = useContext(AuthContext)
+  const {signIn} = useAuth()
 
   const {addToast}  = useToast()
 

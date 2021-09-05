@@ -5,7 +5,7 @@ import Input from '../../components/Input'
 import Button from '../../components/Button'
 import logo from '../../assets/logo.png'
 
-import {AuthContext} from '../../hooks/AuthContext';
+import {useAuth} from '../../hooks/AuthContext';
 import {useToast} from '../../hooks/ToastContext';
 
 import getValidationErrors from '../../utils/getValidationErros'
@@ -27,7 +27,7 @@ const SignInAdmin: React.FC = () => {
 
   const formRef= useRef<FormHandles>(null)
 
-  const {signInUser} = useContext(AuthContext)
+  const {signInUser} = useAuth()
   const {addToast}  = useToast()
 
 //função para validar os campos do formulario

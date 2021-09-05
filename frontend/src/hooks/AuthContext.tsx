@@ -1,4 +1,4 @@
-import React,{createContext,useCallback} from 'react'
+import React,{createContext,useCallback, useContext, useState} from 'react'
 
 import api from '../services/api'
 
@@ -8,9 +8,20 @@ interface SignInCredentials{
 }
 
 interface AuthContextState{
-
+  admin:Object;
+  user:Object;
   signIn(credentials:SignInCredentials):Promise<void>;
   signInUser(credentials:SignInCredentials):Promise<void>;
+}
+
+interface AuthStateUser{
+  token:string;
+  user:Object
+}
+
+interface AuthStateAdmin{
+  token:string;
+  admin:Object
 }
 
 //iniciando um contexto vazio precisa colocar o as e o nome da interface
@@ -18,13 +29,30 @@ const AuthContext = createContext<AuthContextState>({} as AuthContextState)
 
 const AuthProvider:React.FC = ({children}) => {
 
+  const [dataUser,setDataUser] =useState<AuthStateUser>(()=>{
+    const token = localStorage.getItem("@Servico-agora:tokenUser")
+    const user =localStorage.getItem("@Servico-agora")
+
+    if(token && user){
+      return {token,user:JSON.parse(user)}
+    }
+
+    return {} as AuthStateUser
+  })
+
   const signIn = useCallback(async ({email,password}) => {
     const response = await api.post('/session/admin/login',{
       email,
       password
     })
 
-    console.log(response.data)
+    const {token, admin} = response.data
+
+    localStorage.setItem("@Servico-agora:tokenAdmin",token)
+    localStorage.setItem("@Servico-agora",JSON.stringify(admin))
+
+    setDataAdmin({token,admin})
+
   }, [])
 
   const signInUser = useCallback(async ({email,password}) => {
@@ -33,14 +61,43 @@ const AuthProvider:React.FC = ({children}) => {
       password
     })
 
-    console.log(response.data)
+    const {token, user} = response.data
+
+    localStorage.setItem("@Servico-agora:tokenUser",token)
+    localStorage.setItem("@Servico-agora",JSON.stringify(user))
+
+    setDataUser({token, user})
+
   }, [])
 
+  const [dataAdmin,setDataAdmin] =useState<AuthStateAdmin >(()=>{
+    const token = localStorage.getItem("@GoBarber:tokenAdmin")
+    const admin =localStorage.getItem("@GoBarber")
+
+    if(token && admin){
+      return {token,admin:JSON.parse(admin)}
+    }
+
+    return {} as AuthStateAdmin
+  })
+
+  
+
+
   return (
-    <AuthContext.Provider value ={{signInUser, signIn}}>
+    <AuthContext.Provider value ={{admin:dataAdmin.admin,user:dataUser.user,signInUser, signIn}}>
      {children}
      </AuthContext.Provider>
   )
 }
 
-export {AuthProvider,AuthContext}
+function useAuth(): AuthContextState{
+  const context = useContext(AuthContext)
+
+  if(!context) {
+    throw new Error('insira o authprovider ao redor do seu elemento')
+  }
+  return context
+}
+
+export {AuthProvider,useAuth}
