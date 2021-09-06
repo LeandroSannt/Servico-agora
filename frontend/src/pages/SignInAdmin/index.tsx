@@ -31,7 +31,7 @@ const SignInAdmin: React.FC = () => {
 
   const {addToast}  = useToast()
 
-//função para validar os campos do formulario
+//função para validar os campos do formulario 
  const handleSubmit= useCallback(async(data:SignInFormData) =>{
     try{
       
@@ -45,7 +45,7 @@ const SignInAdmin: React.FC = () => {
       await schema.validate(data,{
         abortEarly:false
       })
-      signIn({
+     await signIn({
         email:data.email,
         password:data.password
       })
@@ -53,13 +53,15 @@ const SignInAdmin: React.FC = () => {
       if(err instanceof Yup.ValidationError){
         const errors = getValidationErrors(err)
         formRef.current?.setErrors(errors);
-      }
 
+        return
+      }
       addToast({
         title:'Erro na autenticação',
         type:'error',
         description:'ocorreu um erro ao fazer login, cheque as credenciais'
       })
+      
     }
   },[addToast,signIn])
 

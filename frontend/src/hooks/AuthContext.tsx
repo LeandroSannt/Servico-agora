@@ -83,7 +83,6 @@ const AuthProvider:React.FC = ({children}) => {
 
   
 
-
   return (
     <AuthContext.Provider value ={{admin:dataAdmin.admin,user:dataUser.user,signInUser, signIn}}>
      {children}
