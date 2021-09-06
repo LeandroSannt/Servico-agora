@@ -44,7 +44,7 @@ const SignInAdmin: React.FC = () => {
       await schema.validate(data,{
         abortEarly:false
       })
-      signInUser({
+      await signInUser({
         email:data.email,
         password:data.password
       })
@@ -52,6 +52,8 @@ const SignInAdmin: React.FC = () => {
       if(err instanceof Yup.ValidationError){
         const errors = getValidationErrors(err)
         formRef.current?.setErrors(errors);
+        
+        return
       }
 
       addToast({

@@ -31,13 +31,39 @@ const AuthProvider:React.FC = ({children}) => {
 
   const [dataUser,setDataUser] =useState<AuthStateUser>(()=>{
     const token = localStorage.getItem("@Servico-agora:tokenUser")
-    const user =localStorage.getItem("@Servico-agora")
+    const user =localStorage.getItem("@Servico-agora-user")
 
     if(token && user){
       return {token,user:JSON.parse(user)}
     }
 
     return {} as AuthStateUser
+  })
+
+  const signInUser = useCallback(async ({email,password}) => {
+    const response = await api.post('/session/user/login',{
+      email,
+      password
+    })
+
+    const {token, user} = response.data
+
+    localStorage.setItem("@Servico-agora:tokenUser",token)
+    localStorage.setItem("@Servico-agora-user",JSON.stringify(user))
+
+    setDataUser({token, user})
+
+  }, [])
+
+  const [dataAdmin,setDataAdmin] =useState<AuthStateAdmin >(()=>{
+    const token = localStorage.getItem("@Servico-agora:tokenAdmin")
+    const admin =localStorage.getItem("@Servico-agora-admin")
+
+    if(token && admin){
+      return {token,admin:JSON.parse(admin)}
+    }
+
+    return {} as AuthStateAdmin
   })
 
   const signIn = useCallback(async ({email,password}) => {
@@ -49,37 +75,11 @@ const AuthProvider:React.FC = ({children}) => {
     const {token, admin} = response.data
 
     localStorage.setItem("@Servico-agora:tokenAdmin",token)
-    localStorage.setItem("@Servico-agora",JSON.stringify(admin))
+    localStorage.setItem("@Servico-agora-admin",JSON.stringify(admin))
 
     setDataAdmin({token,admin})
 
   }, [])
-
-  const signInUser = useCallback(async ({email,password}) => {
-    const response = await api.post('/session/user/login',{
-      email,
-      password
-    })
-
-    const {token, user} = response.data
-
-    localStorage.setItem("@Servico-agora:tokenUser",token)
-    localStorage.setItem("@Servico-agora",JSON.stringify(user))
-
-    setDataUser({token, user})
-
-  }, [])
-
-  const [dataAdmin,setDataAdmin] =useState<AuthStateAdmin >(()=>{
-    const token = localStorage.getItem("@GoBarber:tokenAdmin")
-    const admin =localStorage.getItem("@GoBarber")
-
-    if(token && admin){
-      return {token,admin:JSON.parse(admin)}
-    }
-
-    return {} as AuthStateAdmin
-  })
 
   
 
