@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "build": "tsc",
-    "dev:start": "ts-node-dev --inspect --transpile-only --ignore-watch node_modules src/server.ts",
+    "dev:start": "ts-node-dev -r tsconfig-paths/register --inspect --transpile-only --ignore-watch node_modules src/shared/infra/http/server.ts",
     "start": "ts-node src/index.ts",
     "typeorm": "ts-node-dev ./node_modules/typeorm/cli.js"
   },
@@ -27,6 +27,7 @@
     "nodemailer": "^6.6.3",
     "pg": "^8.6.0",
     "reflect-metadata": "^0.1.13",
+    "tsconfig-paths": "^3.11.0",
     "typeorm": "^0.2.34",
     "uuid": "^8.3.2",
     "uuidv4": "^6.2.11"
