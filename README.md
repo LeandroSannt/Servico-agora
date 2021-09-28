@@ -3,11 +3,11 @@
 # Criar Lojas
     - pode criar lojas e vincular usuarios a lojas
 
-# Cadastar e atualizar usuarios
-    - cadastra novos usuarios, atualizar o perfil e envia a senha diretamento para email
-
+# Cadastar e atualizar usuarios 
+    ✔ cadastra novos usuarios,  o perfil e envia a senha diretamento para email
+    - atualizar
 # Cadastar perfis
-    - cadastra novos perfis
+    ✔ cadastra novos perfis
 
 
 # Funções do usuario

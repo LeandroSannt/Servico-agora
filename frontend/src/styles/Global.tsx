@@ -20,7 +20,12 @@ export default createGlobalStyle `
 body{ 
     background: #fff;
     color: #312e38;
+    position:relative;
+    min-height: 100vh;
+    width: 100%;
+    overflow: hidden;
 }
+
 
 body,input,button{
     font-family: 'Roboto', sans-serif;
