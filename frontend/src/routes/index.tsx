@@ -1,5 +1,5 @@
 import React from "react";
-import {Switch} from 'react-router-dom'
+import {Switch,BrowserRouter} from 'react-router-dom'
 
 import RouteAdmin from './RouteAdmin';
 import RouteUser from './RouteUser';
@@ -10,9 +10,12 @@ import DashboardAdmin from "../pages/DashboardAdmin";
 import SignInUser from "../pages/SignInUser";
 import DashboardUser from "../pages/DashboardUser";
 
+import Sidebar from '../components/Sidebar'
+
 
 const Routes: React.FC = () => (
-
+  <BrowserRouter>
+  <Sidebar/>
   <Switch>
     {/* Rotas Admin */}
     <RouteAdmin path='/login' exact component ={SignInAdmin}/>
@@ -22,6 +25,7 @@ const Routes: React.FC = () => (
     <RouteUser path='/' exact component ={SignInUser}/>
     <RouteUser path='/dashboard/User' exact component ={DashboardUser} isPrivateUser  />
   </Switch>
+  </BrowserRouter>
 
 )
 
