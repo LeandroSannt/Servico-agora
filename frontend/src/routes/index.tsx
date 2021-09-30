@@ -15,15 +15,14 @@ import Sidebar from '../components/Sidebar'
 
 const Routes: React.FC = () => (
   <BrowserRouter>
-  <Sidebar/>
   <Switch>
     {/* Rotas Admin */}
     <RouteAdmin path='/login' exact component ={SignInAdmin}/>
-    <RouteAdmin path='/dashboard/Admin' exact component ={DashboardAdmin} isPrivateAdmin  />
-
+    <RouteAdmin path='/dashboard/Admin' exact component ={Sidebar} isPrivateAdmin  />
+  
     {/* Rotas User */}
     <RouteUser path='/' exact component ={SignInUser}/>
-    <RouteUser path='/dashboard/User' exact component ={DashboardUser} isPrivateUser  />
+    <RouteUser path='/dashboard/User' exact component ={Sidebar} isPrivateUser  />
   </Switch>
   </BrowserRouter>
 

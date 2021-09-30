@@ -1,39 +1,47 @@
-import React from "react";
-import {Container,Content} from './styles'
+import React, {useState,useCallback} from "react";
+import {Container} from './styles'
 
-import {
-  FiAlertCircle,
-  FiCheckCircle,
-  FiInfo,
-  FiXCircle,
-} from 'react-icons/fi';
+import { CgAdidas } from "react-icons/cg";
 
 import {MdExitToApp} from 'react-icons/md'
 
-import {GiHamburgerMenu} from 'react-icons/gi'
 
 import LinkPages from '../../components/LinkPages'
 
 const Sidebar: React.FC = () => {
+
+  const [toogle,setToogle] = useState(true)
+
+  const handleClick =useCallback(() =>{
+
+    if(toogle === false){
+      setToogle(true)
+    }else{
+      setToogle(false)
+    }
+
+  },[toogle])
+
+
   const arr = [
-  {active:true,label:'saved',link:"/page1",iconName:"action",c:'1'},
-  {active:true,label:'saved',link:"/page2",iconName:"comedy",c :'2'},
-  {active:true,label:'Profiles',link:"/page3",iconName:"documentary",c:'3'}]
+  {id:'1',active:true,label:'saved',link:"/page1",isAdmin:true},
+  {id:'2',active:true,label:'saved',link:"/page2",isAdmin:false},
+  {id:'3',active:true,label:'Profiles',link:"/page3",isAdmin:true}]
 
   return(
 
     <>
-    <Container className="sidebar active ">
+    <Container {...(toogle ? { className: 'sidebar active' } :  { className: 'sidebar' })} >
 
       <div className="logo_content ">  
           <div className="logo">
-          <FiXCircle size={30}/>
+          <CgAdidas size={30}/>
               <div className="logo_name">Serviço agora</div>
           </div>
-          <i className='bx bx-menu' id="btn" ></i>
+          <i className='bx bx-menu' id="btn" onClick={() =>{handleClick()}} />
 
       </div>
-      <LinkPages list = {arr}/>
+      <LinkPages list = {arr} />
 
       <div className="profile_content">
         <div className="profile">
