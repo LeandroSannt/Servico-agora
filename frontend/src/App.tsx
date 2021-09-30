@@ -5,6 +5,7 @@ import GlobalStyle  from './styles/Global';
 import AppProvider from './hooks'
 
 import Routes from './routes'
+import RoutesUser from './routes'
 function App() {
   return (
     <Router>

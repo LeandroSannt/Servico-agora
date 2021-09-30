@@ -10,21 +10,29 @@ import DashboardAdmin from "../pages/DashboardAdmin";
 import SignInUser from "../pages/SignInUser";
 import DashboardUser from "../pages/DashboardUser";
 
+import Users from '../pages/DashboardAdmin/Users'
+
+
 import Sidebar from '../components/Sidebar'
 
 
 const Routes: React.FC = () => (
+  <>
   <BrowserRouter>
-  <Switch>
-    {/* Rotas Admin */}
-    <RouteAdmin path='/login' exact component ={SignInAdmin}/>
-    <RouteAdmin path='/dashboard/Admin' exact component ={Sidebar} isPrivateAdmin  />
-  
-    {/* Rotas User */}
-    <RouteUser path='/' exact component ={SignInUser}/>
-    <RouteUser path='/dashboard/User' exact component ={Sidebar} isPrivateUser  />
-  </Switch>
+    <Switch>
+      {/* Rotas Admin */}
+      <RouteAdmin path='/login' exact component ={SignInAdmin}/>
+      <RouteUser path='/' exact component ={SignInUser}/>
+      <Sidebar/>
+      <Switch>
+        <RouteAdmin path='/dashboard/Admin' exact component ={DashboardAdmin} isPrivateAdmin  />
+        <RouteAdmin path='/dashboard/Admin/Usuarios' exact component ={Users} isPrivateAdmin  />
+        <RouteUser path='/dashboard/User' exact component ={Sidebar} isPrivateUser  />
+      </Switch>
+    </Switch>
   </BrowserRouter>
+
+</>
 
 )
 

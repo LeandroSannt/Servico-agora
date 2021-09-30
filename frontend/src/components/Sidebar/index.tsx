@@ -8,7 +8,7 @@ import {MdExitToApp} from 'react-icons/md'
 
 import LinkPages from '../../components/LinkPages'
 
-const Sidebar: React.FC = () => {
+const Sidebar: React.FC = ({children}) => {
 
   const [toogle,setToogle] = useState(true)
 
@@ -24,7 +24,7 @@ const Sidebar: React.FC = () => {
 
 
   const arr = [
-  {id:'1',active:true,label:'saved',link:"/page1",isAdmin:true},
+  {id:'1',active:true,label:'Usúarios',link:"/dashboard/Admin/Usuarios",isAdmin:true},
   {id:'2',active:true,label:'saved',link:"/page2",isAdmin:false},
   {id:'3',active:true,label:'Profiles',link:"/page3",isAdmin:true}]
 
@@ -58,6 +58,7 @@ const Sidebar: React.FC = () => {
         </div>
       </div>
 
+    {children}
     </Container>
    
 

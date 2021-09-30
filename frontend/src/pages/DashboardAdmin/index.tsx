@@ -1,5 +1,7 @@
 import React from "react";
 import {Container,Content} from './styles'
+import Users from './Users'
+
 
 import Sidebar from '../../components/Sidebar'
 
@@ -12,15 +14,14 @@ import {
 
 import {MdExitToApp} from 'react-icons/md'
 
-import {GiHamburgerMenu} from 'react-icons/gi'
 
-const DashboardUser: React.FC = () => {
+const DashboardAdmin: React.FC = () => {
   return(
 
     <>
-    <h1>ola mundo</h1>
+    <Sidebar/>
   </>
   )
 }
 
-export default DashboardUser
+export default DashboardAdmin

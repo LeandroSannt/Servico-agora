@@ -1,14 +1,7 @@
 import React from "react";
 import {Container }from './styles'
 import {Link} from 'react-router-dom'
-import {IconBaseProps} from 'react-icons'
-import {Icon}  from '../Icon';
-import {
-  FiAlertCircle,
-  FiCheckCircle,
-  FiInfo,
-  FiXCircle,
-} from 'react-icons/fi';
+import {FiXCircle} from 'react-icons/fi';
 
 interface iconProps{
   active:boolean;
