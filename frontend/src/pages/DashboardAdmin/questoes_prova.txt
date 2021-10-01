@@ -1,0 +1,10 @@
+1 questao: confiabilidade e segurança
+2 questao: regras de segurança das organizações, papel da auditoria nelas
+3 questao: funções basicas de processamento de um sistema operacional, pq auditoria de um banco de dados ou um sistema operacional
+4 questao: custos e uma auditoria
+5 questao: qual o papel de um auditor de sistemas, papel, finalidade, medidas que ele utiliza
+6 questao: oque seria os plano de contigencia em uma auditoria e oque eles fazem
+7 questão: quais ações e atividades aplicadas em auditoria e oque é um relatorio de auditoria
+8 questao: definir oque seria um relatorio final de auditoria
+9 questao: oque seria cronograma e tempo de trabalho em uma auditoria
+10 questao: definir o objetivo dos controles internos em uma auditoria

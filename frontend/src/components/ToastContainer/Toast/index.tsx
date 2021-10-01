@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import react, { useEffect } from 'react';
 import {
   FiAlertCircle,
   FiCheckCircle,
@@ -33,7 +33,7 @@ export const Toast: React.FC<ToastProps> = ({ message, style }) => {
     };
   }, [removeToast, message.id]);
 
-  console.log(message)
+  console.log(message);
 
   return (
     <Container

@@ -1,27 +1,22 @@
-import React from "react";
-import {Container,Content} from './styles'
-import Users from './Users'
-
-
-import Sidebar from '../../components/Sidebar'
-
+import react from 'react';
 import {
   FiAlertCircle,
   FiCheckCircle,
   FiInfo,
   FiXCircle,
 } from 'react-icons/fi';
+import { MdExitToApp } from 'react-icons/md';
+import { Container, Content } from './styles';
+import Users from './Users';
 
-import {MdExitToApp} from 'react-icons/md'
-
+import Sidebar from '../../components/Sidebar';
 
 const DashboardAdmin: React.FC = () => {
-  return(
-
+  return (
     <>
-    <Sidebar/>
-  </>
-  )
-}
+      <Sidebar />
+    </>
+  );
+};
 
-export default DashboardAdmin
+export default DashboardAdmin;
