@@ -74,3 +74,5 @@ export const Container = styled.ul`
     }
   }
 `;
+
+export const Drop = styled.div``;
