@@ -37,17 +37,13 @@ class ProfileController {
   async update(request: Request, response: Response) {
     const updateProfile = new ProfileService();
 
-    //const profile = await updateProfile.executeUpdate({})
+    const { id } = request.params;
 
-    // await getRepository(Profile).update(id,request.body)
+    const { ativo, name } = request.body;
 
-    // const updateProfile = await getRepository(Profile).findOne(id)
+    const profile = await updateProfile.executeUpdate({ id, name, ativo });
 
-    // if(!updateProfile){
-    //   throw new Error("Perfil não foi encontrada")
-    // }
-
-    // return response.json(updateProfile)
+    return response.json(profile);
   }
 
   async delete(request: Request, response: Response) {
@@ -56,7 +52,7 @@ class ProfileController {
 
     profilesServices.executeDelete(id);
 
-    return response.json({ message: "deletado com sucesso" });
+    return response.status(200);
   }
 }
 

@@ -1,18 +1,16 @@
 import { EntityRepository, Repository } from "typeorm";
 
-import Profile from '../entities/profiles'
+import Profile from "../entities/profiles";
 
 @EntityRepository(Profile)
 class ProfilesRepository extends Repository<Profile> {
-
-  public async findBy(name:string):Promise<Profile> {
+  public async findBy(name: string): Promise<Profile> {
     const findName = await this.findOne({
-      where:{name}
-    })
+      where: { name },
+    });
 
-    return findName
-
+    return findName;
   }
 }
 
-export {ProfilesRepository}
+export { ProfilesRepository };

@@ -43,10 +43,17 @@ class ProfileService {
     const profilesRepository = getCustomRepository(ProfilesRepository);
 
     const findProfile = await profilesRepository.findOne(id);
+    const hasProfile = await profilesRepository.findBy(name);
+
+    if (hasProfile) {
+      throw new AppError("Perfil ja castrado", 500);
+    }
 
     if (!findProfile) {
-      throw new AppError("Perfil não encontrado", 404);
+      throw new AppError("Perfil não encontrado", 500);
     }
+
+    profilesRepository.merge(findProfile, { name, ativo });
 
     profilesRepository.save(findProfile);
 
