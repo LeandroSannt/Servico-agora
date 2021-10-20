@@ -18,6 +18,6 @@ routes.use("/session", sessionRouter);
 routes.use("/admin", adminRouter);
 routes.use("/stores", storesRouter);
 routes.use("/menu", menuRouter);
-routes.use("/profiles", AuthUser, UnauthorizedUser, profileRouter);
+routes.use("/profiles", profileRouter);
 
 export default routes;

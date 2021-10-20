@@ -1,43 +1,41 @@
-import {Request, Response} from 'express';
-import { getCustomRepository, getRepository } from 'typeorm';
-import { ProfilesRepository } from '@modules/profiles/infra/typeorm/repositories/ProfilesRepository';
-import {ProfileService} from '@modules/profiles/services/ProfileService'
-import Profile from '../../typeorm/entities/profiles'
-
+import { Request, Response } from "express";
+import { getCustomRepository, getRepository } from "typeorm";
+import { ProfilesRepository } from "@modules/profiles/infra/typeorm/repositories/ProfilesRepository";
+import { ProfileService } from "@modules/profiles/services/ProfileService";
+import Profile from "../../typeorm/entities/profiles";
 
 class ProfileController {
-  async post(request: Request, response: Response){
-    const {name,ativo} = request.body
+  async post(request: Request, response: Response) {
+    const { name, ativo } = request.body;
 
-    const createProfile = new ProfileService()
+    const createProfile = new ProfileService();
 
     const profile = await createProfile.execute({
       name,
-      ativo
-    })
+      ativo,
+    });
 
-    return response.json(profile)
+    return response.json(profile);
   }
 
-  async show(request: Request, response: Response){
-    const {id} = request.params
+  async show(request: Request, response: Response) {
+    const { id } = request.params;
 
-    const showProfile = await getRepository(Profile).findOne(id)
+    const showProfile = await getRepository(Profile).findOne(id);
 
-    return response.json(showProfile)
+    return response.json(showProfile);
   }
 
-  async list(request: Request, response: Response){
-    const profileRepository = getCustomRepository(ProfilesRepository)
+  async list(request: Request, response: Response) {
+    const profileRepository = getCustomRepository(ProfilesRepository);
 
-    const profile = await profileRepository.find()
+    const profile = await profileRepository.find();
 
-    return response.json(profile)
+    return response.json(profile);
   }
 
-  async update(request: Request, response: Response){
-
-    const updateProfile = new ProfileService()
+  async update(request: Request, response: Response) {
+    const updateProfile = new ProfileService();
 
     //const profile = await updateProfile.executeUpdate({})
 
@@ -52,16 +50,14 @@ class ProfileController {
     // return response.json(updateProfile)
   }
 
-  async delete(request: Request, response: Response){
-    const {id} = request.params
+  async delete(request: Request, response: Response) {
+    const profilesServices = new ProfileService();
+    const { id } = request.params;
 
-    await getRepository(Profile).delete(id)
+    profilesServices.executeDelete(id);
 
-    return response.json({message:"deletado com sucesso"})
+    return response.json({ message: "deletado com sucesso" });
   }
 }
 
-
-export {ProfileController}
-
-
+export { ProfileController };

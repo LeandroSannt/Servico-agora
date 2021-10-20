@@ -5,6 +5,7 @@ const menuRouter = Router();
 
 const menuController = new MenuController();
 
+menuRouter.get("/", menuController.list);
 menuRouter.post("/create-sub-menu", menuController.postSubMenu);
 menuRouter.post("/create-menu", menuController.postMenu);
 

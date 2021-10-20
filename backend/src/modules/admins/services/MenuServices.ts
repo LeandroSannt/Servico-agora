@@ -1,10 +1,12 @@
 import Profile from "../../profiles/infra/typeorm/entities/profiles";
 import AppError from "@shared/errors/AppErros";
 
-import { getRepository } from "typeorm";
+import { getRepository, getCustomRepository, Equal } from "typeorm";
 
 import Menus from "../infra/typeorm/entities/menus";
 import Submenus from "../infra/typeorm/entities/submenus";
+
+import { MenuRepository } from "../infra/typeorm/repositories/MenusRepository";
 
 interface Request {
   label: string;
@@ -25,8 +27,14 @@ class MenuServices {
     isAdmin,
     submenu: { title, linkSubMenu, isActive },
   }: Request): Promise<Menus> {
-    const menusRepository = getRepository(Menus);
+    const menusRepository = getCustomRepository(MenuRepository);
     const sub_menusRepository = getRepository(Submenus);
+
+    const findMenu = await menusRepository.findBy(label);
+
+    if (findMenu) {
+      throw new AppError("Menu ja cadastrado", 500);
+    }
 
     let subMenu = sub_menusRepository.create({
       title,
@@ -54,8 +62,14 @@ class MenuServices {
     isAdmin,
     submenu_id,
   }: Request): Promise<Menus> {
-    const menusRepository = getRepository(Menus);
+    const menusRepository = getCustomRepository(MenuRepository);
     const sub_menusRepository = getRepository(Submenus);
+
+    const findMenu = await menusRepository.findBy(label);
+
+    if (findMenu) {
+      throw new AppError("Menu ja cadastrado", 500);
+    }
 
     const menu = menusRepository.create({
       label,
@@ -67,6 +81,14 @@ class MenuServices {
     await menusRepository.save(menu);
 
     return menu;
+  }
+
+  public async listMenu() {
+    const menusRepository = getCustomRepository(MenuRepository);
+
+    const listMenu = await menusRepository.find();
+
+    return listMenu;
   }
 }
 

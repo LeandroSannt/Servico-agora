@@ -1,58 +1,73 @@
-import Profile from '../../profiles/infra/typeorm/entities/profiles'
-import AppError from '@shared/errors/AppErros'
+import Profile from "../../profiles/infra/typeorm/entities/profiles";
+import AppError from "@shared/errors/AppErros";
 
-import {getCustomRepository} from 'typeorm'
-import { ProfilesRepository } from '../infra/typeorm/repositories/ProfilesRepository'
+import { getCustomRepository } from "typeorm";
+import { ProfilesRepository } from "../infra/typeorm/repositories/ProfilesRepository";
 
-interface Request{
+interface Request {
   name: string;
-  ativo:boolean;
+  ativo: boolean;
 }
 
-interface RequestUpdate{
-  id:string;
+interface RequestUpdate {
+  id: string;
   name: string;
-  ativo:boolean;
+  ativo: boolean;
 }
 
+class ProfileService {
+  public async execute({ name, ativo }: Request): Promise<Profile> {
+    const profilesRepository = getCustomRepository(ProfilesRepository);
 
-class ProfileService{
-  public async execute({name,ativo}:Request):Promise<Profile>{
-  const profilesRepository = getCustomRepository(ProfilesRepository)
+    const findName = await profilesRepository.findBy(name);
 
-  const findName = await profilesRepository.findBy(
-    name
-  )
-
-  if(findName) {
-    throw new AppError("Perfil ja cadastrado")
-  }
-
-  const profile = profilesRepository.create({
-    name,
-    ativo:true
-  })
-
-  await profilesRepository.save(profile)
-
-  return profile
-
-  }
-
-  public async executeUpdate({id,name,ativo}:RequestUpdate):Promise<Profile>{
-    const profilesRepository = getCustomRepository(ProfilesRepository)
-
-    const findProfile = await profilesRepository.findOne(id)
-
-    if(!findProfile){
-      throw new AppError("Perfil não encontrado",404)
+    if (findName) {
+      throw new AppError("Perfil ja cadastrado");
     }
 
-    profilesRepository.save(findProfile)
+    const profile = profilesRepository.create({
+      name,
+      ativo: true,
+    });
 
-    return findProfile
+    await profilesRepository.save(profile);
 
+    return profile;
+  }
+
+  public async executeUpdate({
+    id,
+    name,
+    ativo,
+  }: RequestUpdate): Promise<Profile> {
+    const profilesRepository = getCustomRepository(ProfilesRepository);
+
+    const findProfile = await profilesRepository.findOne(id);
+
+    if (!findProfile) {
+      throw new AppError("Perfil não encontrado", 404);
+    }
+
+    profilesRepository.save(findProfile);
+
+    return findProfile;
+  }
+
+  public async executeDelete(id: string): Promise<Profile> {
+    const profilesRepository = getCustomRepository(ProfilesRepository);
+
+    const findProfile = await profilesRepository.findOne(id);
+
+    if (!findProfile) {
+      throw new AppError("Perfil não encontrado", 404);
+    }
+
+    const profile = profilesRepository.remove(findProfile);
+
+    profilesRepository.save(findProfile);
+
+    return findProfile;
   }
 }
 
-export {ProfileService}
+export { ProfileService };

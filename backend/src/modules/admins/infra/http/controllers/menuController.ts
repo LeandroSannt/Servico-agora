@@ -36,6 +36,16 @@ class MenuController {
 
     return response.json(menu);
   }
+
+  async list(request: Request, response: Response) {
+    const listServices = new MenuServices();
+
+    const list = listServices.listMenu();
+
+    console.log(list);
+
+    return response.json(list);
+  }
 }
 
 export default MenuController;
