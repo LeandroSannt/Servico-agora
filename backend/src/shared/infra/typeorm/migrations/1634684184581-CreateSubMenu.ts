@@ -20,7 +20,7 @@ export class CreateSubMenu1634684184581 implements MigrationInterface {
           },
 
           {
-            name: "link",
+            name: "linkSubMenu",
             type: "varchar",
             isNullable: false,
           },
@@ -30,17 +30,6 @@ export class CreateSubMenu1634684184581 implements MigrationInterface {
             type: "boolean",
             isNullable: false,
             default: false,
-          },
-
-          {
-            name: "created_at",
-            type: "timestamp",
-            default: "now()",
-          },
-          {
-            name: "updated_at",
-            type: "timestamp",
-            default: "now()",
           },
         ],
       })

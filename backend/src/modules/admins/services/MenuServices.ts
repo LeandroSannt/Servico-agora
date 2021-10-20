@@ -10,50 +10,37 @@ interface Request {
   label: string;
   link: string;
   isAdmin: boolean;
-  submenu: {
-    title: string;
-    link: string;
-    isActive: boolean;
+  submenu_id?: string;
+  submenu?: {
+    title?: string;
+    linkSubMenu?: string;
+    isActive?: boolean;
   };
 }
 
-interface RequestUpdate {
-  id: string;
-  name: string;
-  ativo: boolean;
-}
-
 class MenuServices {
-  public async post({
+  public async postSubMenu({
     label,
     link,
     isAdmin,
-    submenu: { title, isActive },
+    submenu: { title, linkSubMenu, isActive },
   }: Request): Promise<Menus> {
     const menusRepository = getRepository(Menus);
     const sub_menusRepository = getRepository(Submenus);
 
-    let subMenu = await sub_menusRepository.findOne({
-      where: {
-        title: label,
-      },
+    let subMenu = sub_menusRepository.create({
+      title,
+      linkSubMenu,
+      isActive,
     });
 
-    if (!subMenu) {
-      subMenu = sub_menusRepository.create({
-        title,
-        link,
-        isActive,
-      });
-
-      await sub_menusRepository.save(subMenu);
-    }
+    await sub_menusRepository.save(subMenu);
 
     const menu = menusRepository.create({
       label,
       link,
       isAdmin,
-      submenu: { title, link, isActive },
+      submenu: subMenu,
     });
 
     await menusRepository.save(menu);
@@ -61,23 +48,26 @@ class MenuServices {
     return menu;
   }
 
-  /*  public async executeUpdate({
-    id,
-    name,
-    ativo,
-  }: RequestUpdate): Promise<Profile> {
-    const profilesRepository = getCustomRepository(ProfilesRepository);
+  public async postMenu({
+    label,
+    link,
+    isAdmin,
+    submenu_id,
+  }: Request): Promise<Menus> {
+    const menusRepository = getRepository(Menus);
+    const sub_menusRepository = getRepository(Submenus);
 
-    const findProfile = await profilesRepository.findOne(id);
+    const menu = menusRepository.create({
+      label,
+      link,
+      isAdmin,
+      submenu_id,
+    });
 
-    if (!findProfile) {
-      throw new AppError("Perfil não encontrado", 404);
-    }
+    await menusRepository.save(menu);
 
-    profilesRepository.save(findProfile);
-
-    return findProfile;
-  } */
+    return menu;
+  }
 }
 
 export { MenuServices };

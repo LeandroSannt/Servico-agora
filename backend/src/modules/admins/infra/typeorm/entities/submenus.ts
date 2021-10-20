@@ -21,16 +21,10 @@ class SubMenus {
   title: string;
 
   @Column()
-  link: string;
+  linkSubMenu: string;
 
   @Column()
   isActive: boolean;
-
-  @CreateDateColumn()
-  created_at: Date;
-
-  @UpdateDateColumn()
-  updated_at: Date;
 
   constructor() {
     if (!this.id) {
