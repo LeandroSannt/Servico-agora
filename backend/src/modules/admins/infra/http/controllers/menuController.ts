@@ -40,11 +40,41 @@ class MenuController {
   async list(request: Request, response: Response) {
     const listServices = new MenuServices();
 
-    const list = listServices.listMenu();
-
-    console.log(list);
+    const list = await listServices.listMenu();
 
     return response.json(list);
+  }
+
+  async update(request: Request, response: Response) {
+    const menuServices = new MenuServices();
+
+    const { id } = request.params;
+
+    const {
+      label,
+      link,
+      isAdmin,
+      submenu: { title, linkSubMenu, isActive },
+    } = request.body;
+
+    const menu = await menuServices.executeUpdate({
+      id,
+      label,
+      link,
+      isAdmin,
+      submenu: { title, linkSubMenu, isActive },
+    });
+
+    return response.json(menu);
+  }
+
+  async delete(request: Request, response: Response) {
+    const menuServices = new MenuServices();
+    const { id } = request.params;
+
+    await menuServices.executeDelete(id);
+
+    return response.status(200).json();
   }
 }
 

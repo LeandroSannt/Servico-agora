@@ -7,8 +7,10 @@ import Menus from "../infra/typeorm/entities/menus";
 import Submenus from "../infra/typeorm/entities/submenus";
 
 import { MenuRepository } from "../infra/typeorm/repositories/MenusRepository";
+import Menu from "../infra/typeorm/entities/menus";
 
 interface Request {
+  id?: string;
   label: string;
   link: string;
   isAdmin: boolean;
@@ -19,6 +21,8 @@ interface Request {
     isActive?: boolean;
   };
 }
+
+interface RequestUpdate {}
 
 class MenuServices {
   public async postSubMenu({
@@ -89,6 +93,49 @@ class MenuServices {
     const listMenu = await menusRepository.find();
 
     return listMenu;
+  }
+
+  public async executeUpdate({
+    id,
+    label,
+    link,
+    isAdmin,
+    submenu: { title, linkSubMenu, isActive },
+  }: Request): Promise<Menu> {
+    const menusRepository = getCustomRepository(MenuRepository);
+
+    const findMenu = await menusRepository.findOne(id);
+
+    if (!findMenu) {
+      throw new AppError("Menu não encontrado", 404);
+    }
+
+    menusRepository.merge(findMenu, {
+      label,
+      link,
+      isAdmin,
+      submenu: { title, linkSubMenu, isActive },
+    });
+
+    menusRepository.save(findMenu);
+
+    return findMenu;
+  }
+
+  public async executeDelete(id: string): Promise<Menu> {
+    const menusRepository = getCustomRepository(MenuRepository);
+
+    const findMenu = await menusRepository.findOne(id);
+
+    if (!findMenu) {
+      throw new AppError("Menu não encontrado", 404);
+    }
+
+    const profile = menusRepository.remove(findMenu);
+
+    menusRepository.save(findMenu);
+
+    return findMenu;
   }
 }
 

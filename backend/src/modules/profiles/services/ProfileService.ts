@@ -16,7 +16,7 @@ interface RequestUpdate {
 }
 
 class ProfileService {
-  public async execute({ name, ativo }: Request): Promise<Profile> {
+  public async execute({ name, ativo = true }: Request): Promise<Profile> {
     const profilesRepository = getCustomRepository(ProfilesRepository);
 
     const findName = await profilesRepository.findBy(name);
@@ -27,7 +27,7 @@ class ProfileService {
 
     const profile = profilesRepository.create({
       name,
-      ativo: true,
+      ativo,
     });
 
     await profilesRepository.save(profile);
@@ -58,7 +58,7 @@ class ProfileService {
     }
 
     if (!findProfile) {
-      throw new AppError("Perfil não encontrado", 500);
+      throw new AppError("Perfil não encontrado", 404);
     }
 
     profilesRepository.merge(findProfile, { name, ativo });
