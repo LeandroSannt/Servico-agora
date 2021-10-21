@@ -1,11 +1,4 @@
-import {
-  createConnection,
-  ConnectionOptions,
-  Connection,
-  getConnection,
-} from "typeorm";
-
-const configPsql: ConnectionOptions = {
+export default {
   name: "teste",
   type: "postgres",
   host: "localhost",
@@ -19,7 +12,3 @@ const configPsql: ConnectionOptions = {
     migrationsDir: "./src/shared/infra/typeorm/migrations",
   },
 };
-createConnection();
-createConnection(configPsql);
-
-export const database2 = getConnection("teste");
