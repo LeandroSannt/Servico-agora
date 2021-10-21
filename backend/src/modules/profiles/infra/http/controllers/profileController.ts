@@ -18,18 +18,10 @@ class ProfileController {
     return response.json(profile);
   }
 
-  async show(request: Request, response: Response) {
-    const { id } = request.params;
-
-    const showProfile = await getRepository(Profile).findOne(id);
-
-    return response.json(showProfile);
-  }
-
   async list(request: Request, response: Response) {
-    const profileRepository = getCustomRepository(ProfilesRepository);
+    const profileService = new ProfileService();
 
-    const profile = await profileRepository.find();
+    const profile = await profileService.executelist();
 
     return response.json(profile);
   }

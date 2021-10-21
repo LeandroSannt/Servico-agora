@@ -48,15 +48,7 @@ const LinkPages: React.FC<LikPagesProps> = ({ list }) => {
     { id: '3', link: 'page3', label: 'drop3' },
   ];
 
-  let testess: teste[] = [];
-
   const drop: LikPagesProps[] = [];
-
-  const MenuDropdown = list.map((menu) => {
-    return itensDrop.filter((item) => {
-      item.id === menu.id ? (testess = { ...item, ...menu }) : 'item';
-    });
-  });
 
   return (
     <Container>

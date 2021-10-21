@@ -35,6 +35,14 @@ class ProfileService {
     return profile;
   }
 
+  public async executelist() {
+    const profileRepository = getCustomRepository(ProfilesRepository);
+
+    const profile = profileRepository.find();
+
+    return profile;
+  }
+
   public async executeUpdate({
     id,
     name,
