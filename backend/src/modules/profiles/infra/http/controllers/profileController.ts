@@ -29,9 +29,8 @@ class ProfileController {
   async update(request: Request, response: Response) {
     const updateProfile = new ProfileService();
 
-    const { id } = request.params;
-
     const { ativo, name } = request.body;
+    const { id } = request.params;
 
     const profile = await updateProfile.executeUpdate({ id, name, ativo });
 

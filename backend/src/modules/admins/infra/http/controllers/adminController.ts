@@ -16,6 +16,23 @@ class AdminController {
     return response.json(admin);
   }
 
+  async update(request: Request, response: Response) {
+    const adminServices = new AdminService();
+
+    const { name, email, password, confirmPassword } = request.body;
+    const { id } = request.params;
+
+    const admin = await adminServices.executeUpdate({
+      id,
+      name,
+      email,
+      password,
+      confirmPassword,
+    });
+
+    return response.json(admin);
+  }
+
   async createUserStore(request: Request, response: Response) {
     const { name, email, password, avatar, store_id, profile_id } =
       request.body;
