@@ -1,7 +1,7 @@
 import { getRepository, getCustomRepository } from "typeorm";
 import { UserRepository } from "@modules/users/infra/typeorm/repositories/UserRepository";
-import Admin from "@modules/admins/infra/typeorm/entities/admins";
 import { AdminRepository } from "@modules/admins/infra/typeorm/repositories/AdminRepository";
+import Admin from "@modules/admins/infra/typeorm/entities/admins";
 import User from "@modules/users/infra/typeorm/entities/users";
 import AppError from "@shared/errors/AppErros";
 
@@ -59,7 +59,6 @@ class AdminService {
     const adminsRepository = getCustomRepository(AdminRepository);
 
     const findAdmin = await adminsRepository.findBy(id);
-    const findEmail = await adminsRepository.findByEmail(email);
 
     if (password !== confirmPassword) {
       throw new AppError("Senha e confirmação de senha não são iguais", 400);
