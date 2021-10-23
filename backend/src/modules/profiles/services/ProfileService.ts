@@ -19,12 +19,6 @@ class ProfileService {
   public async execute({ name, ativo = true }: Request): Promise<Profile> {
     const profilesRepository = getCustomRepository(ProfilesRepository);
 
-    const findName = await profilesRepository.findBy(name);
-
-    if (findName) {
-      throw new AppError("Perfil ja cadastrado");
-    }
-
     const profile = profilesRepository.create({
       name,
       ativo,
@@ -52,14 +46,6 @@ class ProfileService {
 
     const findProfile = await profilesRepository.findOne(id);
     const hasProfile = await profilesRepository.findBy(name);
-
-    if (hasProfile) {
-      throw new AppError("Perfil ja castrado", 500);
-    }
-
-    if (!findProfile) {
-      throw new AppError("Perfil não encontrado", 404);
-    }
 
     profilesRepository.merge(findProfile, { name, ativo });
 

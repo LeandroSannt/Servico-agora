@@ -1,13 +1,14 @@
 import Router from "express";
 import { ProfileController } from "../controllers/profileController";
+import { ProvileValidators } from "@shared/validators/ProfileValidators";
 
 const profileRouter = Router();
 
 const profileController = new ProfileController();
 
-profileRouter.post("/", profileController.post);
+profileRouter.post("/", ProvileValidators, profileController.post);
 profileRouter.get("/", profileController.list);
-profileRouter.put("/edit/:id", profileController.update);
+profileRouter.put("/edit/:id", ProvileValidators, profileController.update);
 profileRouter.delete("/:id", profileController.delete);
 
 export default profileRouter;
