@@ -54,15 +54,10 @@ class AdminService {
     name,
     email,
     password,
-    confirmPassword,
   }: RequestUpdate): Promise<Admin> {
     const adminsRepository = getCustomRepository(AdminRepository);
 
     const findAdmin = await adminsRepository.findBy(id);
-
-    if (password !== confirmPassword) {
-      throw new AppError("Senha e confirmação de senha não são iguais", 400);
-    }
 
     const admin = adminsRepository.merge(findAdmin, {
       name,
