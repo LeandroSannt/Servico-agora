@@ -1,70 +1,71 @@
-import {Request,Response,NextFunction} from 'express'
-import {verify} from 'jsonwebtoken'
-import AppError from '@shared/errors/AppErros'
+import { Request, Response, NextFunction } from "express";
+import { verify } from "jsonwebtoken";
+import AppError from "@shared/errors/AppErros";
 
+import authconfig from "@config/auth";
 
-import authconfig from '@config/auth'
-
-interface tokenPayload{
-  iat:number
-  exp:number
-  sub:string
+interface tokenPayload {
+  iat: number;
+  exp: number;
+  sub: string;
 }
 
-function authAdmin(request:Request,response:Response,next:NextFunction): void{
+function AuthAdmin(
+  request: Request,
+  response: Response,
+  next: NextFunction
+): void {
+  const authHeader = request.headers.authorization;
 
-  const authHeader = request.headers.authorization
-
-  if(!authHeader){
-    throw new AppError('JWT is missing')
+  if (!authHeader) {
+    throw new AppError("JWT is missing");
   }
 
-  const [,token] = authHeader.split(' ')
+  const [, token] = authHeader.split(" ");
 
-  try{
-  const decoded = verify(token, authconfig.jwt.secret)
+  try {
+    const decoded = verify(token, authconfig.jwt.secret);
 
-  const { sub } = decoded as tokenPayload
+    const { sub } = decoded as tokenPayload;
 
-  request.admin = {
-    permissions:sub,
-    email:sub,
-    id :sub
-  }
+    request.admin = {
+      email: sub,
+      id: sub,
+    };
 
-
-  return next()
-
-  }catch{
-    throw new Error('Invalid JWT token')
-  }
-}
-
- function AuthUser(request:Request,response:Response,next:NextFunction): void{
-
-  const authHeader = request.headers.authorization
-
-  if(!authHeader){
-    throw new AppError('JWT is missing')
-  }
-
-  const [,token] = authHeader.split(' ')
-
-  try{
-  const decoded = verify(token, authconfig.jwt.secret)
-
-  const { sub } = decoded as tokenPayload
-
-  request.user = {
-    id :sub,
-    //email:sub
-  }
-
-  return next()
-
-  }catch{
-    throw new Error('Invalid JWT token')
+    return next();
+  } catch {
+    throw new Error("Invalid JWT token");
   }
 }
 
-export {authAdmin,AuthUser}
+function AuthUser(
+  request: Request,
+  response: Response,
+  next: NextFunction
+): void {
+  const authHeader = request.headers.authorization;
+
+  if (!authHeader) {
+    throw new AppError("JWT is missing");
+  }
+
+  const [, token] = authHeader.split(" ");
+
+  try {
+    const decoded = verify(token, authconfig.jwt.secret);
+
+    const { sub } = decoded as tokenPayload;
+
+    request.user = {
+      id: sub,
+      //email:sub
+    };
+
+    return next();
+  } catch {
+    throw new Error("Invalid JWT token");
+  }
+}
+
+export { AuthAdmin, AuthUser };

@@ -21,6 +21,9 @@ class Store {
   name: string;
 
   @Column()
+  isActive: boolean;
+
+  @Column()
   cpf_cnpj: string;
 
   @ManyToOne(() => Admin)
@@ -29,13 +32,6 @@ class Store {
 
   @Column()
   admin_id: string;
-
-  @ManyToOne(() => User)
-  @JoinColumn({ name: "user_id" })
-  user: User;
-
-  @Column()
-  user_id: string;
 
   @Column()
   telephone: string;
