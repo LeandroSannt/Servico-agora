@@ -9,37 +9,27 @@ async function StoreValidators(
   next: NextFunction
 ) {
   try {
-    const {
-      id,
-      name,
-      telephone,
-      cpf_cnpj,
-      cep,
-      city,
-      address,
-      complement,
-      avatar_store,
-      admin_id,
-      isActive,
-    } = request.body;
+    const { id, name, cpf_cnpj } = request.body;
 
     const storesRepository = getCustomRepository(StoresRepository);
 
-    const find_Store = await storesRepository.findOne(id);
-    console.log(find_Store);
+    const store = await storesRepository.findOne(id);
 
-    if (find_Store.name !== name) {
-      const find_name = await storesRepository.findByName(name);
+    if (name === store.name) {
+      throw new AppError("Ja existe uma loja com esse nome", 401);
+    }
 
-      if (find_name) {
-        throw new AppError("Ja existe uma loja com esse nome", 401);
-      }
+    if (cpf_cnpj === store.cpf_cnpj) {
+      throw new AppError("Cpf ou cnpj ja cadastrado", 401);
+    }
+
+    if (!store) {
+      throw new AppError("Loja não encontrada", 404);
     }
 
     return next();
   } catch (err) {
-    console.log(err);
-    throw new AppError("Server Error", 500);
+    throw new AppError(err.message, err.statusCode);
   }
 }
 

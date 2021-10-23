@@ -34,28 +34,6 @@ class StoreService {
   }: Request): Promise<Store> {
     const storesRepository = getCustomRepository(StoresRepository);
 
-    //const find_Store = await storesRepository.findOne(id);
-
-    /*  if (find_Store.name !== name) {
-      const find_name = await storesRepository.findByName(name);
-
-      if (find_name) {
-        throw new AppError("Ja existe uma loja com esse nome", 401);
-      }
-    }
-
-    if (find_Store.cpf_cnpj !== cpf_cnpj) {
-      const findCpf_cnpj = await storesRepository.findByCpf_Cnpj(cpf_cnpj);
-
-      if (findCpf_cnpj) {
-        throw new AppError("Cpf ou cnpj ja cadastrado", 401);
-      }
-    }
-
-    if (!find_Store) {
-      throw new AppError("Loja não encontrada", 404);
-    } */
-
     const store = storesRepository.create({
       name,
       cpf_cnpj,
@@ -88,26 +66,6 @@ class StoreService {
     const storesRepository = getCustomRepository(StoresRepository);
 
     const find_Store = await storesRepository.findOne(id);
-
-    /*if (find_Store.name !== name) {
-      const find_name = await storesRepository.findByName(name);
-
-      if (find_name) {
-        throw new AppError("Ja existe uma loja com esse nome", 401);
-      }
-    }
-
-    if (find_Store.cpf_cnpj !== cpf_cnpj) {
-      const findCpf_cnpj = await storesRepository.findByCpf_Cnpj(cpf_cnpj);
-
-      if (findCpf_cnpj) {
-        throw new AppError("Cpf ou cnpj ja cadastrado", 401);
-      }
-    }
-
-    if (!find_Store) {
-      throw new AppError("Loja não encontrada", 404);
-    } */
 
     const store = storesRepository.merge(find_Store, {
       name,

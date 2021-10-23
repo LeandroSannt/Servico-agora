@@ -19,7 +19,7 @@ const StoresController = new StoreController();
 storesRouter.post(
   "/",
   upload.single("avatar_store"),
-
+  StoreValidators,
   StoresController.post
 );
 storesRouter.get("/", StoresController.list);
