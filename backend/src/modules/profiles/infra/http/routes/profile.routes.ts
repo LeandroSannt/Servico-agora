@@ -1,6 +1,6 @@
 import Router from "express";
 import { ProfileController } from "../controllers/profileController";
-import { ProvileValidators } from "@shared/validators/ProfileValidators";
+import { ProvileValidators } from "../validators/ProfileValidators";
 
 const profileRouter = Router();
 

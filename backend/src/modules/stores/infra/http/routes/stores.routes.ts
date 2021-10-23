@@ -1,5 +1,5 @@
 import { StoreController } from "../../controllers/storeController";
-import { StoreValidators } from "@shared/validators/StoreValidors";
+import { StoreValidators } from "@modules/stores/infra/http/validators/StoreValidors";
 import multer from "multer";
 import uploadConfig from "@config/upload";
 import Router from "express";

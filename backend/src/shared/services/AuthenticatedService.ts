@@ -1,83 +1,79 @@
-import {getRepository} from 'typeorm'
-import Admin from '@modules/admins/infra/typeorm/entities/admins'
-import authconfig from '@config/auth'
-import AppError from '../errors/AppErros'
+import { getRepository } from "typeorm";
+import Admin from "@modules/admins/infra/typeorm/entities/admins";
+import authconfig from "@config/auth";
+import AppError from "../errors/AppErros";
 
-import {sign} from 'jsonwebtoken'
-import {compare} from 'bcryptjs'
-import User from '@modules/users/infra/typeorm/entities/users'
+import { sign } from "jsonwebtoken";
+import { compare } from "bcryptjs";
+import User from "@modules/users/infra/typeorm/entities/users";
 
-interface Request{
-  email: string
-  password: string
+interface Request {
+  email: string;
+  password: string;
 }
 
 interface Response {
-  admin:Admin
-  token:string
+  admin: Admin;
+  token: string;
 }
 
-interface ResponseUser{
-  user:User;
-  token:string;
-
+interface ResponseUser {
+  user: User;
+  token: string;
 }
 
-class AuthenticationService{
-  public async execute({email,password}:Request):Promise<Response>{
-    const adminRepository = getRepository(Admin)
+class AuthenticationService {
+  public async execute({ email, password }: Request): Promise<Response> {
+    const adminRepository = getRepository(Admin);
 
-    const admin = await adminRepository.findOne({where:{email}})
+    const admin = await adminRepository.findOne({ where: { email } });
 
-    if(!admin){
-      throw new AppError("admin not found",404)
+    if (!admin) {
+      throw new AppError("Incorrect email/password combination", 404);
     }
 
-    const passwordmatcher = await compare(password,admin.password)
+    const passwordmatcher = await compare(password, admin.password);
 
-    if(!passwordmatcher){
-      throw new Error('Incorrect email/password combination')
+    if (!passwordmatcher) {
+      throw new AppError("Incorrect email/password combination", 404);
     }
 
-    const token = sign({},authconfig.jwt.secret,{
-      subject:admin.id,
-      expiresIn:authconfig.jwt.expiresIn
-    })
+    const token = sign({}, authconfig.jwt.secret, {
+      subject: admin.id,
+      expiresIn: authconfig.jwt.expiresIn,
+    });
 
     return {
       admin,
-      token
-    }
-
+      token,
+    };
   }
 
-  public async authUser({email,password}:Request):Promise<ResponseUser>{
-     const userRepository = getRepository(User)
+  public async authUser({ email, password }: Request): Promise<ResponseUser> {
+    const userRepository = getRepository(User);
 
-    const user = await userRepository.findOne({where:{email}})
+    const user = await userRepository.findOne({ where: { email } });
 
-    if(!user){
-      throw new AppError("admin not found",404)
+    if (!user) {
+      throw new AppError("admin not found", 404);
     }
 
-    const passwordmatcher = await compare(password,user.password)
+    const passwordmatcher = await compare(password, user.password);
 
-    if(!passwordmatcher){
-      throw new AppError('Incorrect email/password combination')
+    if (!passwordmatcher) {
+      throw new AppError("Incorrect email/password combination");
     }
 
-    const token = sign({},authconfig.jwt.secret,{
-      subject:user.id,
-      expiresIn:authconfig.jwt.expiresIn
-    })
+    const token = sign({}, authconfig.jwt.secret, {
+      subject: user.id,
+      expiresIn: authconfig.jwt.expiresIn,
+    });
 
     return {
       user,
-      token
-    }
+      token,
+    };
   }
 }
 
-export default AuthenticationService
-
-
+export default AuthenticationService;
