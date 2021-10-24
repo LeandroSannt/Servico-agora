@@ -22,6 +22,9 @@ class Menu {
   label: string;
 
   @Column()
+  profile_id: string;
+
+  @Column()
   link: string;
 
   @Column()

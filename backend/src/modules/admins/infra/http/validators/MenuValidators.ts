@@ -1,26 +1,61 @@
-import { Request, Response, NextFunction } from "express";
-import { getRepository, getCustomRepository } from "typeorm";
-import Menus from "@modules/admins/infra/typeorm/entities/menus";
 import AppError from "@shared/errors/AppErros";
+
+import { getRepository, getCustomRepository, Equal } from "typeorm";
+
+import Menu from "@modules/admins/infra/typeorm/entities/menus";
+import Submenus from "@modules/admins/infra/typeorm/entities/submenus";
 
 import { MenuRepository } from "@modules/admins/infra/typeorm/repositories/MenusRepository";
 
-async function MenuValidators(
+import { Request, Response, NextFunction } from "express";
+
+async function CreateMenuValidators(
   request: Request,
   response: Response,
   next: NextFunction
 ) {
   try {
-    const { name, email, id } = request.body;
+    const {
+      label,
+      isAdmin,
+      link,
+      profile_id,
+      submenu: { title, isActive, linkSubMenu },
+    } = request.body;
 
-    const adminsRepository = getRepository(Admin);
+    const sub_menusRepository = getRepository(Submenus);
 
-    const admin = await adminsRepository.findOne(id);
+    const menusRepository = getCustomRepository(MenuRepository);
 
-    console.log(admin.email);
+    const findlabelMenu = await menusRepository.findOne(linkSubMenu);
 
-    if (email === admin.email) {
-      throw new AppError("Ja existe um administrador com esse email", 401);
+    return next();
+  } catch (err) {
+    throw new AppError(err.message, err.statusCode);
+  }
+}
+
+async function UpdateMenuValidators(
+  request: Request,
+  response: Response,
+  next: NextFunction
+) {
+  try {
+    const {
+      id,
+      label,
+      isAdmin,
+      link,
+      profile_id,
+      submenu: { title, isActive, linkSubMenu },
+    } = request.body;
+
+    const menusRepository = getCustomRepository(MenuRepository);
+
+    const menu = await menusRepository.findOne(id);
+
+    if (!menu) {
+      throw new AppError("Menu não encontrado", 404);
     }
 
     return next();
@@ -29,4 +64,4 @@ async function MenuValidators(
   }
 }
 
-export { MenuRepository };
+export { UpdateMenuValidators };

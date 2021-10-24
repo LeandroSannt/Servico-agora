@@ -23,8 +23,6 @@ interface Request {
   };
 }
 
-interface RequestUpdate {}
-
 class MenuServices {
   public async postSubMenu({
     label,
@@ -34,12 +32,6 @@ class MenuServices {
   }: Request): Promise<Menus> {
     const menusRepository = getCustomRepository(MenuRepository);
     const sub_menusRepository = getRepository(Submenus);
-
-    const findMenu = await menusRepository.findBy(label);
-
-    if (findMenu) {
-      throw new AppError("Menu ja cadastrado", 500);
-    }
 
     let subMenu = sub_menusRepository.create({
       title,
@@ -64,6 +56,7 @@ class MenuServices {
     label,
     link,
     isAdmin,
+    profile_id,
     submenu_id,
   }: Request): Promise<Menus> {
     const menusRepository = getCustomRepository(MenuRepository);
@@ -79,6 +72,7 @@ class MenuServices {
       label,
       link,
       isAdmin,
+      profile_id,
       submenu_id,
     });
 
