@@ -12,9 +12,10 @@ import Menu from "../infra/typeorm/entities/menus";
 interface Request {
   id?: string;
   label: string;
-  link: string;
+  link?: string;
   isAdmin: boolean;
   submenu_id?: string;
+  profile_id: string;
   submenu?: {
     title?: string;
     linkSubMenu?: string;
@@ -27,8 +28,8 @@ interface RequestUpdate {}
 class MenuServices {
   public async postSubMenu({
     label,
-    link,
     isAdmin,
+    profile_id,
     submenu: { title, linkSubMenu, isActive },
   }: Request): Promise<Menus> {
     const menusRepository = getCustomRepository(MenuRepository);
@@ -50,7 +51,6 @@ class MenuServices {
 
     const menu = menusRepository.create({
       label,
-      link,
       isAdmin,
       submenu: subMenu,
     });

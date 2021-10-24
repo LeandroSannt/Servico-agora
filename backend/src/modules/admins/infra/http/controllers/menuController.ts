@@ -5,8 +5,8 @@ class MenuController {
   async postSubMenu(request: Request, response: Response) {
     const {
       label,
-      link,
       isAdmin,
+      profile_id,
       submenu: { title, isActive, linkSubMenu },
     } = request.body;
 
@@ -14,8 +14,8 @@ class MenuController {
 
     const menu = await createMenu.postSubMenu({
       label,
-      link,
       isAdmin,
+      profile_id,
       submenu: { title, isActive, linkSubMenu },
     });
 
@@ -23,7 +23,7 @@ class MenuController {
   }
 
   async postMenu(request: Request, response: Response) {
-    const { label, link, isAdmin, submenu_id } = request.body;
+    const { label, link, isAdmin, submenu_id, profile_id } = request.body;
 
     const createMenu = new MenuServices();
 
@@ -32,6 +32,7 @@ class MenuController {
       link,
       isAdmin,
       submenu_id,
+      profile_id,
     });
 
     return response.json(menu);
@@ -54,6 +55,7 @@ class MenuController {
       label,
       link,
       isAdmin,
+      profile_id,
       submenu: { title, linkSubMenu, isActive },
     } = request.body;
 
@@ -62,6 +64,7 @@ class MenuController {
       label,
       link,
       isAdmin,
+      profile_id,
       submenu: { title, linkSubMenu, isActive },
     });
 
