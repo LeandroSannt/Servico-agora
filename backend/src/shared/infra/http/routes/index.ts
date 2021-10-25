@@ -1,5 +1,6 @@
 import { Router } from "express";
 import storesRouter from "@modules/stores/infra/http/routes/stores.routes";
+import usersRouter from "@modules/users/infra/http/routes/user.routes";
 import adminRouter from "@modules/admins/infra/http/routes/admin.routes";
 import profileRouter from "@modules/profiles/infra/http/routes/profile.routes";
 import menuRouter from "@modules/admins/infra/http/routes/menus.routes";
@@ -15,6 +16,7 @@ const routes = Router();
 routes.use("/session", sessionRouter);
 
 //routes system
+routes.use("/users", AuthAdmin, usersRouter);
 routes.use("/admin", AuthAdmin, adminRouter);
 routes.use("/stores", AuthAdmin, storesRouter);
 routes.use("/menu", AuthAdmin, menuRouter);

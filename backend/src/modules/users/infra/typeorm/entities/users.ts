@@ -1,11 +1,19 @@
-import {Entity, Column, PrimaryGeneratedColumn,CreateDateColumn,UpdateDateColumn,JoinColumn,ManyToOne} from 'typeorm'
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  JoinColumn,
+  ManyToOne,
+} from "typeorm";
 
-import Profile from '../../../../profiles/infra/typeorm/entities/profiles'
-import Store from '../../../../stores/infra/typeorm/entities/stores'
+import Profile from "../../../../profiles/infra/typeorm/entities/profiles";
+import Store from "../../../../stores/infra/typeorm/entities/stores";
 
-@Entity('users')
-class User{
-  @PrimaryGeneratedColumn('uuid')
+@Entity("users")
+class User {
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
@@ -21,25 +29,27 @@ class User{
   avatar: string;
 
   @ManyToOne(() => Store)
-  @JoinColumn({name:'store_id'})
-  store:Store;
+  @JoinColumn({ name: "store_id" })
+  store: Store;
 
   @Column()
   store_id: string;
 
   @ManyToOne(() => Profile)
-  @JoinColumn({name:'profile_id'})
-  profile:Profile;
+  @JoinColumn({ name: "profile_id" })
+  profile: Profile;
 
   @Column()
-  profile_id:string
+  profile_id: string;
 
   @CreateDateColumn()
-  created_at: Date
+  created_at: Date;
 
   @UpdateDateColumn()
-  updated_at: Date
+  updated_at: Date;
 
+  @Column()
+  deleted_at: Date;
 }
 
-export default User
+export default User;
