@@ -24,34 +24,6 @@ interface Request {
 }
 
 class MenuServices {
-  public async postSubMenu({
-    label,
-    isAdmin,
-    profile_id,
-    submenu: { title, linkSubMenu, isActive },
-  }: Request): Promise<Menus> {
-    const menusRepository = getCustomRepository(MenuRepository);
-    const sub_menusRepository = getRepository(Submenus);
-
-    let subMenu = sub_menusRepository.create({
-      title,
-      linkSubMenu,
-      isActive,
-    });
-
-    await sub_menusRepository.save(subMenu);
-
-    const menu = menusRepository.create({
-      label,
-      isAdmin,
-      submenu: subMenu,
-    });
-
-    await menusRepository.save(menu);
-
-    return menu;
-  }
-
   public async postMenu({
     label,
     link,
@@ -74,6 +46,34 @@ class MenuServices {
       isAdmin,
       profile_id,
       submenu_id,
+    });
+
+    await menusRepository.save(menu);
+
+    return menu;
+  }
+
+  public async postSubMenu({
+    label,
+    isAdmin,
+    profile_id,
+    submenu: { title, linkSubMenu, isActive },
+  }: Request): Promise<Menus> {
+    const menusRepository = getCustomRepository(MenuRepository);
+    const sub_menusRepository = getRepository(Submenus);
+
+    let subMenu = sub_menusRepository.create({
+      title,
+      linkSubMenu,
+      isActive,
+    });
+
+    await sub_menusRepository.save(subMenu);
+
+    const menu = menusRepository.create({
+      label,
+      isAdmin,
+      submenu: subMenu,
     });
 
     await menusRepository.save(menu);
