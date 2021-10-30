@@ -16,7 +16,7 @@ const routes = Router();
 routes.use("/session", sessionRouter);
 
 //routes system
-routes.use("/users", AuthAdmin, usersRouter);
+routes.use("/users", AuthAdmin, AuthUser, usersRouter);
 routes.use("/admin", AuthAdmin, adminRouter);
 routes.use("/stores", AuthAdmin, storesRouter);
 routes.use("/menu", AuthAdmin, menuRouter);

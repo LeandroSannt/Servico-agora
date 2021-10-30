@@ -59,7 +59,9 @@ function AuthUser(
 
     request.user = {
       id: sub,
-      //email:sub
+      email: sub,
+      store_id: sub,
+      profile_id: sub,
     };
 
     return next();
