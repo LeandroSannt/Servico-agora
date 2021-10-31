@@ -1,6 +1,9 @@
 import Store from "../infra/typeorm/entities/stores";
 import { StoresRepository } from "../infra/typeorm/repositories/StoresRepository";
 import AppError from "@shared/errors/AppErros";
+import path from "path";
+import fs from "fs";
+import uploadConfig from "@config/upload";
 
 import { getCustomRepository, getRepository } from "typeorm";
 
@@ -16,6 +19,11 @@ interface Request {
   complement?: string;
   admin_id?: string;
   isActive: boolean;
+}
+
+interface FileProps {
+  store_id: string;
+  avatarfilename: string;
 }
 
 class StoreService {
@@ -124,6 +132,35 @@ class StoreService {
     await storesRepository.save(store);
 
     return store;
+  }
+  public async updateStoreAvatar({
+    store_id,
+    avatarfilename,
+  }: FileProps): Promise<Store> {
+    const userRepository = getRepository(Store);
+
+    const user = await userRepository.findOne(store_id);
+
+    if (!user) {
+      throw new AppError("nao foi encontrado usuario");
+    }
+
+    if (user.avatar_store) {
+      const userAvatarFilePath = path.join(
+        uploadConfig.directory,
+        user.avatar_store
+      );
+      const userAvatarFileExists = await fs.promises.stat(userAvatarFilePath);
+
+      if (userAvatarFileExists) {
+        await fs.promises.unlink(userAvatarFilePath);
+      }
+    }
+
+    user.avatar_store = avatarfilename;
+    await userRepository.save(user);
+
+    return user;
   }
 }
 
