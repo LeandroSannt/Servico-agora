@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Button, Input, Textarea, Select } from '@/components/ui'
 import { serviceSchema, type ServiceFormData } from '@/lib/validations'
 import { useCreateService, useUpdateService, useStores } from '@/hooks/api'
-import { useEffect } from 'react'
+import { useEffect, ChangeEvent } from 'react'
 
 interface ServiceFormProps {
   service?: {
@@ -34,6 +34,7 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
     handleSubmit,
     formState: { errors },
     setError,
+    setValue,
   } = useForm<ServiceFormData>({
     resolver: zodResolver(serviceSchema),
     defaultValues: {
@@ -100,12 +101,14 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
 
       <Input
         label="Preço (R$)"
-        type="number"
-        step="0.01"
-        min="0"
-        placeholder="0,00"
+        placeholder="R$ 0,00"
+        mask="currency"
         error={errors.price?.message}
-        {...register('price', { valueAsNumber: true })}
+        {...register('price')}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+          const numValue = parseFloat(e.target.value) || 0
+          setValue('price', numValue)
+        }}
       />
 
       {service && (

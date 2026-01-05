@@ -105,6 +105,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
         <Input
           label="Telefone"
           placeholder="(00) 00000-0000"
+          mask="phone"
           error={errors.phone?.message}
           {...register('phone')}
         />
@@ -120,6 +121,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
         <Input
           label="CPF/CNPJ"
           placeholder="000.000.000-00"
+          mask="cpfCnpj"
           {...register('document')}
         />
       </div>
@@ -136,6 +138,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
           <Input
             label="CEP"
             placeholder="00000-000"
+            mask="cep"
             {...register('zipCode')}
           />
         </div>

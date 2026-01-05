@@ -142,6 +142,7 @@ export default function UserForm({ user, companies, onSuccess, onCancel }: UserF
         <Input
           label="Telefone"
           placeholder="(00) 00000-0000"
+          mask="phone"
           {...register('phone')}
         />
       </div>

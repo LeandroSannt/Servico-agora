@@ -107,6 +107,7 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
         <Input
           label="CNPJ"
           placeholder="00.000.000/0000-00"
+          mask="cnpj"
           error={errors.cnpj?.message}
           {...register('cnpj')}
         />
@@ -122,6 +123,7 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
         <Input
           label="Telefone"
           placeholder="(00) 00000-0000"
+          mask="phone"
           error={errors.phone?.message}
           {...register('phone')}
         />
@@ -147,6 +149,7 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
           <Input
             label="CEP"
             placeholder="00000-000"
+            mask="cep"
             {...register('zipCode')}
           />
         </div>

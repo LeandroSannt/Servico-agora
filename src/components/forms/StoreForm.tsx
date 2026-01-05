@@ -102,6 +102,7 @@ export default function StoreForm({ store, companies, onSuccess, onCancel }: Sto
         <Input
           label="Telefone"
           placeholder="(00) 00000-0000"
+          mask="phone"
           {...register('phone')}
         />
       </div>
@@ -125,6 +126,7 @@ export default function StoreForm({ store, companies, onSuccess, onCancel }: Sto
           <Input
             label="CEP"
             placeholder="00000-000"
+            mask="cep"
             {...register('zipCode')}
           />
         </div>

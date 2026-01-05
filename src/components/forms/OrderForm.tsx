@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react'
 import { Button, Input, Textarea, Select, Checkbox, Modal } from '@/components/ui'
 import { serviceOrderSchema, type ServiceOrderFormData, clientSchema, type ClientFormData } from '@/lib/validations'
 import { useCreateOrder, useUpdateOrder, useClients, useServices, useCreateClient } from '@/hooks/api'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, ChangeEvent } from 'react'
 import { Plus, Trash2, X, UserPlus, Store } from 'lucide-react'
 
 interface OrderFormProps {
@@ -343,11 +343,14 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                     />
                     <Input
                       label="Preço (R$)"
-                      type="number"
-                      step="0.01"
-                      min="0"
+                      placeholder="R$ 0,00"
+                      mask="currency"
                       error={errors.services?.[index]?.price?.message}
-                      {...register(`services.${index}.price` as const, { valueAsNumber: true })}
+                      {...register(`services.${index}.price` as const)}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                        const numValue = parseFloat(e.target.value) || 0
+                        setValue(`services.${index}.price`, numValue)
+                      }}
                     />
                   </div>
                   <Textarea
@@ -467,6 +470,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
             <Input
               label="Telefone *"
               placeholder="(00) 00000-0000"
+              mask="phone"
               error={clientErrors.phone?.message}
               {...registerClient('phone')}
             />
@@ -482,6 +486,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
             <Input
               label="CPF/CNPJ"
               placeholder="000.000.000-00"
+              mask="cpfCnpj"
               {...registerClient('document')}
             />
           </div>
