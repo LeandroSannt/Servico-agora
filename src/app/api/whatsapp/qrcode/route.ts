@@ -73,7 +73,11 @@ export async function GET(request: NextRequest) {
 
     // Tentar criar instância se não existir
     try {
-      console.log('[QRCode] Tentando criar instância:', config.instanceName)
+      console.log('[QRCode] ========== CRIANDO INSTÂNCIA ==========')
+      console.log('[QRCode] Instance Name:', config.instanceName)
+      console.log('[QRCode] API URL:', config.apiUrl)
+      console.log('[QRCode] API Key (primeiros 10 chars):', config.apiKey?.substring(0, 10) + '...')
+
       const createResponse = await axios.post(
         `${config.apiUrl}/instance/create`,
         {
@@ -89,7 +93,7 @@ export async function GET(request: NextRequest) {
           timeout: 15000,
         }
       )
-      console.log('[QRCode] Instância criada:', createResponse.data)
+      console.log('[QRCode] Instância criada com sucesso:', createResponse.status)
 
       // Se a criação já retornou QR Code, usar ele
       if (createResponse.data?.qrcode?.base64) {
@@ -103,7 +107,16 @@ export async function GET(request: NextRequest) {
     } catch (createError) {
       // Instância pode já existir, verificar o erro
       if (axios.isAxiosError(createError)) {
-        console.log('[QRCode] Erro ao criar instância:', createError.response?.data || createError.message)
+        console.log('[QRCode] ========== ERRO AO CRIAR INSTÂNCIA ==========')
+        console.log('[QRCode] Status:', createError.response?.status)
+        console.log('[QRCode] Data:', JSON.stringify(createError.response?.data, null, 2))
+        console.log('[QRCode] Message:', createError.message)
+
+        // Se for 401, a API Key está errada
+        if (createError.response?.status === 401) {
+          console.log('[QRCode] ❌ API KEY INVÁLIDA! Verifique a configuração.')
+        }
+
         // Se não for erro de "já existe", pode ser outro problema
         if (createError.response?.status !== 409 && !createError.response?.data?.message?.includes('already')) {
           // Continuar mesmo assim, pode ser que a instância exista
