@@ -50,28 +50,10 @@ services:
 
   # ==========================================
   # EVOLUTION API (WHATSAPP) - Opcional
+  # Nota: Deploy manual via Docker Hub
+  # Acesse: dashboard.render.com > New > Web Service
+  # Image URL: atendai/evolution-api:latest
   # ==========================================
-  - type: web
-    name: evolution-api
-    runtime: docker
-    plan: starter # Evolution precisa de mais recursos
-    region: oregon
-    dockerImage: atendai/evolution-api:latest
-    envVars:
-      - key: SERVER_URL
-        sync: false # URL do servico apos deploy
-      - key: AUTHENTICATION_API_KEY
-        generateValue: true
-      - key: DATABASE_ENABLED
-        value: "true"
-      - key: DATABASE_PROVIDER
-        value: postgresql
-      - key: DATABASE_CONNECTION_URI
-        fromDatabase:
-          name: servico-agora-db
-          property: connectionString
-      - key: DATABASE_CONNECTION_CLIENT_NAME
-        value: evolution_api
 
 # ==========================================
 # BANCO DE DADOS POSTGRESQL
