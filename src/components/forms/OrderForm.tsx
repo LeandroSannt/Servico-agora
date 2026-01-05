@@ -56,8 +56,8 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     watch,
     setValue,
     setError,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } = useForm<ServiceOrderFormData>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(serviceOrderSchema) as any,
     defaultValues: {
       description: order?.description || '',
