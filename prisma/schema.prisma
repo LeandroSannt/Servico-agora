@@ -1,0 +1,310 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================== WHITE LABEL ====================
+
+// Empresa (White Label)
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  cnpj      String   @unique
+  managerName String @map("manager_name")
+  phone     String
+  email     String   @unique
+
+  // Endereço
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String? @map("zip_code")
+
+  // Personalização
+  primaryColor   String @default("#3B82F6") @map("primary_color")
+  secondaryColor String @default("#1E40AF") @map("secondary_color")
+  logoUrl        String? @map("logo_url")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  stores Store[]
+  users  User[]
+  whatsappConfig WhatsAppConfig?
+
+  @@map("companies")
+}
+
+// Loja da empresa
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  email     String?
+
+  // Endereço
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String? @map("zip_code")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  users         User[]
+  clients       Client[]
+  services      Service[]
+  serviceOrders ServiceOrder[]
+
+  @@map("stores")
+}
+
+// ==================== USUÁRIOS ====================
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  role      UserRole @default(EMPLOYEE)
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  storeId   String?  @map("store_id")
+  store     Store?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  // OS criadas pelo usuário
+  serviceOrdersCreated ServiceOrder[] @relation("OrderCreator")
+
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN  // Admin geral do sistema (gerencia todas as empresas)
+  COMPANY_ADMIN // Admin da empresa (gerencia sua empresa e lojas)
+  MANAGER      // Gerente de loja
+  EMPLOYEE     // Funcionário
+}
+
+// ==================== CLIENTES ====================
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String
+  document  String?  // CPF ou CNPJ
+
+  // Endereço
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String? @map("zip_code")
+
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  storeId String @map("store_id")
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  serviceOrders ServiceOrder[]
+
+  @@map("clients")
+}
+
+// ==================== SERVIÇOS ====================
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  storeId String @map("store_id")
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  orderServices OrderService[]
+
+  @@map("services")
+}
+
+// ==================== ORDENS DE SERVIÇO ====================
+
+model ServiceOrder {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique @map("order_number")
+  description String?
+  status      OrderStatus @default(RECEIVED)
+  pausedReason String?   @map("paused_reason") // Motivo quando status = PAUSED
+
+  // Valores
+  totalAmount Decimal @default(0) @db.Decimal(10, 2) @map("total_amount")
+
+  // Datas
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  finishedAt  DateTime? @map("finished_at")
+  paidAt      DateTime? @map("paid_at")
+
+  // Notificações enviadas?
+  emailSent    Boolean   @default(false) @map("email_sent")
+  whatsappSent Boolean   @default(false) @map("whatsapp_sent")
+
+  // Relações
+  storeId     String @map("store_id")
+  store       Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  clientId    String @map("client_id")
+  client      Client @relation(fields: [clientId], references: [id])
+
+  createdById String @map("created_by_id")
+  createdBy   User   @relation("OrderCreator", fields: [createdById], references: [id])
+
+  // Serviços da OS
+  services OrderService[]
+
+  @@map("service_orders")
+}
+
+enum OrderStatus {
+  RECEIVED    // Recebido
+  IN_PROGRESS // Em Andamento
+  PAUSED      // Pausado
+  FINISHED    // Finalizado
+  PAID        // Pago
+}
+
+// Serviços vinculados à OS (tabela intermediária)
+model OrderService {
+  id          String  @id @default(cuid())
+
+  // Se for serviço existente
+  serviceId   String? @map("service_id")
+  service     Service? @relation(fields: [serviceId], references: [id])
+
+  // Dados do serviço (copiados ou customizados)
+  serviceName  String  @map("service_name")
+  description  String?
+  price        Decimal @db.Decimal(10, 2)
+  quantity     Int     @default(1)
+
+  // Se é um serviço novo que deve ser salvo globalmente
+  saveGlobally Boolean @default(false) @map("save_globally")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relações
+  orderId String       @map("order_id")
+  order   ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_services")
+}
+
+// ==================== WHATSAPP ====================
+
+// Configuração WhatsApp por Company
+model WhatsAppConfig {
+  id           String  @id @default(cuid())
+  instanceName String  @map("instance_name")
+  apiKey       String  @map("api_key")
+  apiUrl       String  @default("http://localhost:8080") @map("api_url")
+  isConnected  Boolean @default(false) @map("is_connected")
+  phoneNumber  String? @map("phone_number")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relação
+  companyId String  @unique @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Templates e logs
+  templates   MessageTemplate[]
+  messageLogs MessageLog[]
+
+  @@map("whatsapp_configs")
+}
+
+// Templates de mensagem WhatsApp
+model MessageTemplate {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  // Tipo de status que ativa este template
+  triggerStatus OrderStatus @map("trigger_status")
+
+  // Conteúdo do template com variáveis
+  // Variáveis disponíveis: {{clientName}}, {{orderNumber}}, {{storeName}}, {{companyName}}, {{services}}, {{totalAmount}}, {{status}}
+  content     String  @db.Text
+
+  isActive    Boolean @default(true) @map("is_active")
+  isDefault   Boolean @default(false) @map("is_default")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relação
+  whatsappConfigId String         @map("whatsapp_config_id")
+  whatsappConfig   WhatsAppConfig @relation(fields: [whatsappConfigId], references: [id], onDelete: Cascade)
+
+  @@map("message_templates")
+}
+
+// Log de mensagens enviadas
+model MessageLog {
+  id          String  @id @default(cuid())
+
+  // Dados da mensagem
+  phone       String
+  message     String  @db.Text
+  status      MessageStatus @default(PENDING)
+  errorMessage String? @map("error_message")
+
+  // Referência à OS (opcional)
+  orderNumber String? @map("order_number")
+
+  // Timestamps
+  sentAt      DateTime? @map("sent_at")
+  deliveredAt DateTime? @map("delivered_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relação
+  whatsappConfigId String         @map("whatsapp_config_id")
+  whatsappConfig   WhatsAppConfig @relation(fields: [whatsappConfigId], references: [id], onDelete: Cascade)
+
+  @@map("message_logs")
+}
+
+enum MessageStatus {
+  PENDING    // Aguardando envio
+  SENT       // Enviada
+  DELIVERED  // Entregue
+  READ       // Lida
+  FAILED     // Falhou
+}

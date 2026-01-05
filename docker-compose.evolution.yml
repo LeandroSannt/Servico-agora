@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # Evolution API - WhatsApp API
+  evolution-api:
+    image: atendai/evolution-api:latest
+    container_name: servico-agora-evolution
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Configurações do servidor
+      SERVER_URL: http://localhost:8080
+
+      # Autenticação
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-sua-api-key-segura-aqui}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: true
+
+      # Configurações de instância
+      DEL_INSTANCE: false
+      CONFIG_SESSION_PHONE_CLIENT: ServicoAgora
+      CONFIG_SESSION_PHONE_NAME: Chrome
+
+      # Banco de dados (SQLite local ou pode usar PostgreSQL)
+      DATABASE_ENABLED: true
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-servico_agora}?schema=evolution
+      DATABASE_CONNECTION_CLIENT_NAME: evolution_api
+      DATABASE_SAVE_DATA_INSTANCE: true
+      DATABASE_SAVE_DATA_NEW_MESSAGE: true
+      DATABASE_SAVE_MESSAGE_UPDATE: true
+      DATABASE_SAVE_DATA_CONTACTS: true
+      DATABASE_SAVE_DATA_CHATS: true
+
+      # Redis (para cache e filas)
+      CACHE_REDIS_ENABLED: true
+      CACHE_REDIS_URI: redis://redis:6379/0
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_LOCAL_ENABLED: false
+
+      # RabbitMQ (opcional - para processamento assíncrono)
+      RABBITMQ_ENABLED: false
+
+      # Webhook (para receber mensagens - opcional)
+      WEBHOOK_GLOBAL_URL: ''
+      WEBHOOK_GLOBAL_ENABLED: false
+      WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: false
+
+      # Storage (para mídia)
+      S3_ENABLED: false
+
+      # Logs
+      LOG_LEVEL: ERROR
+      LOG_COLOR: true
+      LOG_BAILEYS: error
+
+      # QR Code
+      QRCODE_LIMIT: 30
+      QRCODE_COLOR: '#000000'
+
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - servico-agora-network
+
+  # Redis - Cache para Evolution API
+  redis:
+    image: redis:7-alpine
+    container_name: servico-agora-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - servico-agora-network
+
+  # PostgreSQL (usa o mesmo do docker-compose.yml principal se já existir)
+  postgres:
+    image: postgres:16-alpine
+    container_name: servico-agora-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
+      POSTGRES_DB: ${POSTGRES_DB:-servico_agora}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-servico_agora}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - servico-agora-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  evolution_instances:
+  evolution_store:
+
+networks:
+  servico-agora-network:
+    driver: bridge

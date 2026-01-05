@@ -1,0 +1,4 @@
+-- Step 1: Add new enum values to OrderStatus
+ALTER TYPE "OrderStatus" ADD VALUE IF NOT EXISTS 'RECEIVED';
+ALTER TYPE "OrderStatus" ADD VALUE IF NOT EXISTS 'IN_PROGRESS';
+ALTER TYPE "OrderStatus" ADD VALUE IF NOT EXISTS 'PAUSED';
