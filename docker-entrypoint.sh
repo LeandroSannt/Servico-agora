@@ -9,7 +9,7 @@ sleep 5
 
 # Roda as migrações do Prisma
 echo "📦 Aplicando schema do banco de dados..."
-npx prisma db push --url="$DATABASE_URL" --accept-data-loss --skip-generate || echo "⚠️ Falha ao aplicar schema, continuando..."
+npx prisma db push --url="$DATABASE_URL" --accept-data-loss || echo "⚠️ Falha ao aplicar schema, continuando..."
 
 echo "✅ Iniciando servidor Next.js..."
 exec node server.js
