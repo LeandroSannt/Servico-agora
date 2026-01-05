@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Button, Input, Textarea, Select } from '@/components/ui'
 import { serviceSchema, type ServiceFormData } from '@/lib/validations'
 import { useCreateService, useUpdateService, useStores } from '@/hooks/api'
-import { useEffect, ChangeEvent } from 'react'
+import { useEffect } from 'react'
 
 interface ServiceFormProps {
   service?: {
@@ -34,9 +34,9 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
     handleSubmit,
     formState: { errors },
     setError,
-    setValue,
   } = useForm<ServiceFormData>({
-    resolver: zodResolver(serviceSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(serviceSchema) as any,
     defaultValues: {
       name: service?.name || '',
       description: service?.description || '',
@@ -59,10 +59,16 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
 
   const onSubmit = async (data: ServiceFormData) => {
     try {
+      // Garantir que price é número (pode vir como string do input com máscara)
+      const normalizedData = {
+        ...data,
+        price: typeof data.price === 'string' ? parseFloat(data.price) || 0 : data.price,
+      }
+
       if (service) {
-        await updateMutation.mutateAsync({ id: service.id, data })
+        await updateMutation.mutateAsync({ id: service.id, data: normalizedData })
       } else {
-        await createMutation.mutateAsync(data)
+        await createMutation.mutateAsync(normalizedData)
       }
       onSuccess()
     } catch {
@@ -105,10 +111,6 @@ export default function ServiceForm({ service, onSuccess, onCancel }: ServiceFor
         mask="currency"
         error={errors.price?.message}
         {...register('price')}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => {
-          const numValue = parseFloat(e.target.value) || 0
-          setValue('price', numValue)
-        }}
       />
 
       {service && (
