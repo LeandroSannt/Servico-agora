@@ -576,10 +576,10 @@ export default function OrdersPage() {
             <div className="border-t pt-4">
               <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Cliente</h4>
               <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="font-medium text-sm sm:text-base">{viewOrder.client.name}</p>
-                <p className="text-xs sm:text-sm text-gray-600">{viewOrder.client.phone}</p>
+                <p className="font-medium text-sm sm:text-base text-gray-900">{viewOrder.client.name}</p>
+                <p className="text-xs sm:text-sm text-gray-700">{viewOrder.client.phone}</p>
                 {viewOrder.client.email && (
-                  <p className="text-xs sm:text-sm text-gray-600">{viewOrder.client.email}</p>
+                  <p className="text-xs sm:text-sm text-gray-700">{viewOrder.client.email}</p>
                 )}
               </div>
             </div>
@@ -588,7 +588,7 @@ export default function OrdersPage() {
             {viewOrder.description && (
               <div className="border-t pt-4">
                 <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Descrição</h4>
-                <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-800 bg-gray-50 p-3 rounded-lg">
                   {viewOrder.description}
                 </p>
               </div>
@@ -604,13 +604,13 @@ export default function OrdersPage() {
                     className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-gray-50 p-3 rounded-lg gap-1 sm:gap-4"
                   >
                     <div className="min-w-0">
-                      <p className="font-medium text-sm sm:text-base truncate">{service.serviceName}</p>
+                      <p className="font-medium text-sm sm:text-base text-gray-900 truncate">{service.serviceName}</p>
                       {service.description && (
-                        <p className="text-xs sm:text-sm text-gray-500 truncate">{service.description}</p>
+                        <p className="text-xs sm:text-sm text-gray-700 truncate">{service.description}</p>
                       )}
                     </div>
                     <div className="sm:text-right flex sm:flex-col justify-between sm:justify-end items-center sm:items-end">
-                      <p className="text-xs sm:text-sm text-gray-500">
+                      <p className="text-xs sm:text-sm text-gray-700">
                         {formatCurrency(service.price)} x {service.quantity}
                       </p>
                       <p className="font-semibold text-green-600 text-sm sm:text-base">
@@ -623,7 +623,7 @@ export default function OrdersPage() {
             </div>
 
             {/* Dates */}
-            <div className="border-t pt-4 text-xs sm:text-sm text-gray-500 space-y-1">
+            <div className="border-t pt-4 text-xs sm:text-sm text-gray-600 space-y-1">
               <p>Criado em: {formatDate(viewOrder.createdAt)}</p>
               <p>Atualizado em: {formatDate(viewOrder.updatedAt)}</p>
             </div>
