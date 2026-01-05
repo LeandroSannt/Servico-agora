@@ -8,6 +8,11 @@ const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || 'http://localhost:808
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || ''
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'servico-agora'
 
+// Normaliza a URL removendo barras finais para evitar URLs duplicadas (ex: //instance)
+function normalizeUrl(url: string): string {
+  return url.replace(/\/+$/, '')
+}
+
 interface SendMessageParams {
   phone: string
   message: string
@@ -191,6 +196,9 @@ async function sendWhatsAppMessage({
 
   const formattedPhone = formatPhoneNumber(phone)
 
+  // Normalizar URL para evitar barras duplas
+  apiUrl = normalizeUrl(apiUrl)
+
   console.log('[WhatsApp] ========== ENVIANDO MENSAGEM ==========')
   console.log('[WhatsApp] Telefone original:', phone)
   console.log('[WhatsApp] Telefone formatado:', formattedPhone)
@@ -368,6 +376,9 @@ export async function checkWhatsAppConnection(companyId?: string): Promise<boole
       }
     }
 
+    // Normalizar URL para evitar barras duplas
+    apiUrl = normalizeUrl(apiUrl)
+
     const response = await axios.get(
       `${apiUrl}/instance/connectionState/${instanceName}`,
       {
@@ -423,6 +434,9 @@ export async function getWhatsAppQRCode(companyId?: string): Promise<string | nu
       }
     }
 
+    // Normalizar URL para evitar barras duplas
+    apiUrl = normalizeUrl(apiUrl)
+
     const response = await axios.get(
       `${apiUrl}/instance/connect/${instanceName}`,
       {
@@ -473,6 +487,9 @@ async function sendWhatsAppDocument({
   }
 
   const formattedPhone = formatPhoneNumber(phone)
+
+  // Normalizar URL para evitar barras duplas
+  apiUrl = normalizeUrl(apiUrl)
 
   console.log('[WhatsApp] ========== ENVIANDO DOCUMENTO ==========')
   console.log('[WhatsApp] Telefone:', formattedPhone)

@@ -3,6 +3,11 @@ import prisma from '@/lib/prisma'
 import { requireRoles } from '@/lib/auth-utils'
 import axios from 'axios'
 
+// Normaliza a URL removendo barras finais
+function normalizeUrl(url: string): string {
+  return url.replace(/\/+$/, '')
+}
+
 // GET /api/whatsapp/qrcode - Obter QR Code para conexão
 export async function GET(request: NextRequest) {
   try {
@@ -39,10 +44,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const apiUrl = normalizeUrl(config.apiUrl)
+
     // Verificar se a instância já está conectada
     try {
       const stateResponse = await axios.get(
-        `${config.apiUrl}/instance/connectionState/${config.instanceName}`,
+        `${apiUrl}/instance/connectionState/${config.instanceName}`,
         {
           headers: { apikey: config.apiKey },
           timeout: 10000,
@@ -75,11 +82,11 @@ export async function GET(request: NextRequest) {
     try {
       console.log('[QRCode] ========== CRIANDO INSTÂNCIA ==========')
       console.log('[QRCode] Instance Name:', config.instanceName)
-      console.log('[QRCode] API URL:', config.apiUrl)
+      console.log('[QRCode] API URL:', apiUrl)
       console.log('[QRCode] API Key (primeiros 10 chars):', config.apiKey?.substring(0, 10) + '...')
 
       const createResponse = await axios.post(
-        `${config.apiUrl}/instance/create`,
+        `${apiUrl}/instance/create`,
         {
           instanceName: config.instanceName,
           qrcode: true,
@@ -128,7 +135,7 @@ export async function GET(request: NextRequest) {
     let qrResponse
     try {
       qrResponse = await axios.get(
-        `${config.apiUrl}/instance/connect/${config.instanceName}`,
+        `${apiUrl}/instance/connect/${config.instanceName}`,
         {
           headers: { apikey: config.apiKey },
           timeout: 30000,
@@ -140,7 +147,7 @@ export async function GET(request: NextRequest) {
         console.log('[QRCode] Instância não encontrada, criando...')
         try {
           const createResponse = await axios.post(
-            `${config.apiUrl}/instance/create`,
+            `${apiUrl}/instance/create`,
             {
               instanceName: config.instanceName,
               qrcode: true,
@@ -166,7 +173,7 @@ export async function GET(request: NextRequest) {
 
           // Tentar conectar novamente após criar
           qrResponse = await axios.get(
-            `${config.apiUrl}/instance/connect/${config.instanceName}`,
+            `${apiUrl}/instance/connect/${config.instanceName}`,
             {
               headers: { apikey: config.apiKey },
               timeout: 30000,
@@ -186,7 +193,7 @@ export async function GET(request: NextRequest) {
     if (!qrCode) {
       // Verificar se conectou durante o processo
       const stateCheck = await axios.get(
-        `${config.apiUrl}/instance/connectionState/${config.instanceName}`,
+        `${apiUrl}/instance/connectionState/${config.instanceName}`,
         {
           headers: { apikey: config.apiKey },
           timeout: 10000,
@@ -229,8 +236,9 @@ export async function GET(request: NextRequest) {
       message: 'Escaneie o QR Code com seu WhatsApp',
     })
   } catch (error) {
-    console.error('Erro ao obter QR Code:', error)
     if (axios.isAxiosError(error)) {
+      console.error('Erro ao obter QR Code:', error!.response)
+      console.error('Erro ao obter QR Code:', error!.response!.headers)
       return NextResponse.json(
         {
           error: 'Erro ao conectar com Evolution API',
@@ -282,9 +290,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const apiUrl = normalizeUrl(config.apiUrl)
+
     // Verificar status
     const response = await axios.get(
-      `${config.apiUrl}/instance/connectionState/${config.instanceName}`,
+      `${apiUrl}/instance/connectionState/${config.instanceName}`,
       {
         headers: { apikey: config.apiKey },
         timeout: 10000,
@@ -354,9 +364,11 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    const apiUrl = normalizeUrl(config.apiUrl)
+
     // Desconectar instância
     await axios.delete(
-      `${config.apiUrl}/instance/logout/${config.instanceName}`,
+      `${apiUrl}/instance/logout/${config.instanceName}`,
       {
         headers: { apikey: config.apiKey },
         timeout: 10000,
