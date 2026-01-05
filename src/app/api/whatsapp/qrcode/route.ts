@@ -37,6 +37,8 @@ export async function GET(request: NextRequest) {
       where: { companyId },
     })
 
+    console.log('config',config)
+
     if (!config) {
       return NextResponse.json(
         { error: 'Configuração WhatsApp não encontrada. Configure primeiro.' },
@@ -237,8 +239,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      console.error('Erro ao obter QR Code:', error!.response)
-      console.error('Erro ao obter QR Code:', error!.response!.headers)
       return NextResponse.json(
         {
           error: 'Erro ao conectar com Evolution API',
