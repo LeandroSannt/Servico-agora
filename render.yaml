@@ -1,0 +1,84 @@
+# Render Blueprint - Infraestrutura como Codigo
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ==========================================
+  # APLICACAO NEXT.JS
+  # ==========================================
+  - type: web
+    name: servico-agora
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free # Mude para 'starter' em producao
+    region: oregon # ou 'frankfurt' para Europa
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: servico-agora-db
+          property: connectionString
+      - key: DIRECT_URL
+        fromDatabase:
+          name: servico-agora-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: AUTH_URL
+        sync: false # Configurar manualmente apos deploy
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        sync: false # Configurar manualmente apos deploy
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: EVOLUTION_API_URL
+        sync: false
+      - key: EVOLUTION_API_KEY
+        sync: false
+      - key: EVOLUTION_INSTANCE
+        sync: false
+
+  # ==========================================
+  # EVOLUTION API (WHATSAPP) - Opcional
+  # ==========================================
+  - type: web
+    name: evolution-api
+    runtime: docker
+    plan: starter # Evolution precisa de mais recursos
+    region: oregon
+    dockerImage: atendai/evolution-api:latest
+    envVars:
+      - key: SERVER_URL
+        sync: false # URL do servico apos deploy
+      - key: AUTHENTICATION_API_KEY
+        generateValue: true
+      - key: DATABASE_ENABLED
+        value: "true"
+      - key: DATABASE_PROVIDER
+        value: postgresql
+      - key: DATABASE_CONNECTION_URI
+        fromDatabase:
+          name: servico-agora-db
+          property: connectionString
+      - key: DATABASE_CONNECTION_CLIENT_NAME
+        value: evolution_api
+
+# ==========================================
+# BANCO DE DADOS POSTGRESQL
+# ==========================================
+databases:
+  - name: servico-agora-db
+    plan: free # Mude para 'starter' em producao
+    region: oregon
+    databaseName: servico_agora
+    user: admin
