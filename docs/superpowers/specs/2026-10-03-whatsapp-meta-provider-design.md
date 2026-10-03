@@ -81,7 +81,8 @@ model MessageLog {
 - `whatsappConfigSchema` vira `z.discriminatedUnion('provider', [...])`:
   - `EVOLUTION`: `instanceName`, `apiKey` (opcional no PUT, ver abaixo), `apiUrl`, `companyId`.
   - `META`: `metaPhoneNumberId`, `metaWabaId` obrigatórios; `metaAccessToken` obrigatório no POST e opcional no PUT (vazio/ausente mantém o atual); `metaAppId` opcional; `apiUrl` opcional (default do banco); `companyId`.
-  - Para o PUT, usar `whatsappConfigUpdateSchema` = mesma união com `apiKey` e `metaAccessToken` opcionais.
+  - Para o PUT, usar `whatsappConfigUpdateSchema` = mesma união com `apiKey` e `metaAccessToken` opcionais e **sem** `companyId` (vem de `existingConfig`); `id` é lido do body fora do schema. `provider` é obrigatório no POST e no PUT (a união não tem default; o seletor da tela sempre envia).
+  - Regra de segredo resultante no PUT: se o provedor resultante for META e nem o body nem o registro atual tiverem `metaAccessToken` → `400 { error: 'Token de acesso é obrigatório' }`; idem EVOLUTION com `apiKey` → `400 { error: 'API Key é obrigatória' }`. Só depois disso chama-se `checkConnection()`.
 - `messageTemplateSchema`: `triggerStatus: z.enum(['RECEIVED','IN_PROGRESS','PAUSED','FINISHED','PAID'])`; `content` opcional (o handler exige `min(10)` só quando o config é Evolution); novos campos opcionais `metaTemplateName` (regex `^[a-z0-9_]{1,512}$`) e `metaLanguage`.
 - `defaultTemplates` ganha a entrada `PAID` com o texto atual da legenda de pagamento:
 
@@ -133,7 +134,7 @@ interface MessagingProvider {
   sendDocument(input: { phone: string; template: TemplateRef; pdf: Buffer; fileName: string }): Promise<SendResult>
   checkConnection(): Promise<{ connected: boolean; phoneNumber?: string | null; error?: string }>
   // Só Evolution (opcionais na interface):
-  getQRCode?(): Promise<string | null>
+  ensureInstanceAndGetQRCode?(): Promise<string | null>   // cria a instância se não existir e devolve o QR em base64
   disconnect?(): Promise<void>
   // Só Meta (opcionais):
   createTemplates?(defs: MetaTemplateDefinition[]): Promise<MetaTemplateResult[]>
@@ -148,7 +149,7 @@ interface MessagingProvider {
 - `renderText(content, vars)`: semântica atual de `replaceTemplateVariables` (serviços em várias linhas `  • Nome (2x) - R$ 40.00`, total `toFixed(2)`, `pausedReason` com prefixo `\n📝 *Motivo:* ...\n` ou vazio).
 - `toMetaParams(status, vars): string[]`: ordem da tabela abaixo, cada item por `sanitizeParam` (remove `\r\n\t`, colapsa espaços, `trim`, corta em 1000 chars). Serviços em uma linha: `Nome (2x) R$ 40,00; Outro (1x) R$ 15,00`. Total `1.234,56` (pt-BR, sem "R$").
 - `metaTemplateName(status, companyId)` = `os_<status minúsculo>_<6 últimos chars do companyId>`.
-- `metaTemplateBodies(companyName)`: textos dos 5 templates com `{{n}}` (abaixo) e exemplos.
+- `metaTemplateBodies(companyName)`: textos dos 5 templates com `{{n}}` e os exemplos, listados em "Textos dos templates Meta".
 
 | Status | {{1}} | {{2}} | {{3}} | {{4}} | {{5}} | {{6}} |
 |---|---|---|---|---|---|---|
@@ -157,6 +158,106 @@ interface MessagingProvider {
 | PAID (cabeçalho: documento) | clientName | orderNumber | totalAmount | — | — | — |
 
 O nome da empresa entra no texto fixo (template é por empresa), não como variável.
+
+### Textos dos templates Meta (`metaTemplateBodies`)
+
+Regras de derivação a partir de `defaultTemplates`: `{{services}}` vira uma única linha após "*Serviços:* "; `{{pausedReason}}` vira a linha fixa `📝 *Motivo:* {{6}}`; `{{companyName}}` vira o nome literal da empresa; as linhas "_Mensagem automática - Não responda_" e a frase de retirada do FINISHED permanecem. Exemplos (`example.body_text`): `["Maria Silva", "1042", "Loja Centro", "Troca de tela (1x) R$ 350,00", "350,00"]`, mais `"Aguardando peça"` no PAUSED; PAID: `["Maria Silva", "1042", "350,00"]`.
+
+RECEIVED (`os_received_<id6>`):
+```
+📥 *Serviço Recebido*
+
+Olá, *{{1}}*!
+
+Recebemos sua ordem de serviço e em breve iniciaremos o atendimento.
+
+📋 *Ordem de Serviço:* #{{2}}
+🏪 *Loja:* {{3}}
+
+*Serviços:* {{4}}
+
+💰 *Total:* R$ {{5}}
+
+_<Empresa>_
+_Mensagem automática - Não responda_
+```
+
+IN_PROGRESS (`os_in_progress_<id6>`):
+```
+🔧 *Serviço Em Andamento*
+
+Olá, *{{1}}*!
+
+Seu serviço está sendo realizado pela nossa equipe.
+
+📋 *Ordem de Serviço:* #{{2}}
+🏪 *Loja:* {{3}}
+
+*Serviços:* {{4}}
+
+💰 *Total:* R$ {{5}}
+
+_<Empresa>_
+_Mensagem automática - Não responda_
+```
+
+PAUSED (`os_paused_<id6>`):
+```
+⏸️ *Serviço Pausado*
+
+Olá, *{{1}}*!
+
+Seu serviço está pausado.
+📝 *Motivo:* {{6}}
+
+📋 *Ordem de Serviço:* #{{2}}
+🏪 *Loja:* {{3}}
+
+*Serviços:* {{4}}
+
+💰 *Total:* R$ {{5}}
+
+_<Empresa>_
+_Mensagem automática - Não responda_
+```
+
+FINISHED (`os_finished_<id6>`):
+```
+✅ *Serviço Finalizado*
+
+Olá, *{{1}}*!
+
+Seu serviço foi concluído e está pronto para retirada!
+
+📋 *Ordem de Serviço:* #{{2}}
+🏪 *Loja:* {{3}}
+
+*Serviços:* {{4}}
+
+💰 *Total:* R$ {{5}}
+
+🎉 Por favor, compareça à nossa loja para retirar seu produto/serviço.
+
+_<Empresa>_
+_Mensagem automática - Não responda_
+```
+
+PAID (`os_paid_<id6>`, cabeçalho DOCUMENT):
+```
+💚 *Pagamento Confirmado!*
+
+Olá, *{{1}}*!
+
+Agradecemos pela preferência! Seu pagamento foi confirmado.
+
+📋 *OS:* #{{2}}
+💰 *Total:* R$ {{3}}
+
+Segue em anexo o comprovante da sua ordem de serviço.
+
+_<Empresa>_
+_Obrigado pela confiança!_
+```
 
 ### Regras em `index.ts` (as atuais, agora independentes do provedor)
 
@@ -169,6 +270,7 @@ O nome da empresa entra no texto fixo (template é por empresa), não como vari�
 4. Gravar `MessageLog` quando há config: `status` `SENT`/`FAILED`, `errorMessage`, `providerMessageId`, `orderNumber`, `phone` formatado, e `message`:
    - Evolution: texto enviado (como hoje); PAID: `[PDF] OS_<n>.pdf - <legenda>`.
    - Meta: `[META <name>/<language>] {{1}}=...; {{2}}=...`; PAID: `[PDF] OS_<n>.pdf [META <name>/<language>] {{1}}=...`.
+   - Meta, `FAILED` sem envio (template não aprovado/inativo): `message = '[META <name>/<language>] (não enviado)'`, com o motivo em `errorMessage`.
 5. `checkWhatsAppConnection(companyId?)`: `provider.checkConnection()` e grava `isConnected`/`phoneNumber` na config.
 
 ### Resolução do provedor (`resolve-provider.ts`)
@@ -216,8 +318,8 @@ O nome da empresa entra no texto fixo (template é por empresa), não como vari�
   - `POST`: valida com a união; cria config e os **5** templates de `defaultTemplates` (`isDefault = true`); para Meta, `metaTemplateName = metaTemplateName(status, companyId)`, `metaStatus = NOT_CREATED`. Com `provider = META`, chama `checkConnection()` e persiste `isConnected`/`phoneNumber`.
   - `PUT`: valida com `whatsappConfigUpdateSchema`; `metaAccessToken`/`apiKey` vazios mantêm o atual. Trocar o provedor zera `isConnected`/`phoneNumber`. Com `provider = META`: garante os 5 templates (cria os ausentes de `defaultTemplates`), preenche `metaTemplateName` nulo e chama `checkConnection()`. Voltar para EVOLUTION mantém os templates.
 - **`/api/whatsapp/qrcode`**
-  - `POST` (verificar conexão): sempre `200 { connected, state: 'open' | 'disconnected', phoneNumber?, error? }`, via `checkWhatsAppConnection(companyId)`.
-  - `GET` (QR) e `DELETE` (desconectar): com Meta → `400 { error: 'Operação disponível apenas para o provedor Evolution' }`; com Evolution → via provedor, como hoje.
+  - `POST` (verificar conexão): mantém as guardas atuais (`400` sem empresa, `403` sem permissão, `404` sem config); o resultado da verificação é sempre `200 { connected, state: 'open' | 'disconnected', phoneNumber?, error? }`, via `checkWhatsAppConnection(companyId)`.
+  - `GET` (QR) e `DELETE` (desconectar): com Meta → `400 { error: 'Operação disponível apenas para o provedor Evolution' }`. Com Evolution, o fluxo atual de criar a instância (`POST /instance/create` com `integration: 'WHATSAPP-BAILEYS'`, tentativa de novo em 404) e obter o QR passa para o provedor como `ensureInstanceAndGetQRCode?(): Promise<string | null>` (substitui `getQRCode?`); a rota só valida permissão, carrega a config (agora com `instanceName`/`apiKey` não nulos garantidos pela validação do ramo EVOLUTION) e chama o provedor. `DELETE` chama `disconnect?()` (`/instance/logout`).
 - **`/api/whatsapp/templates`**: `PUT` com Meta ignora `content` e aceita `isActive`, `metaTemplateName`, `metaLanguage`; com Evolution, `content` obrigatório (`min 10`).
 - **`/api/whatsapp/templates/sync`** (novo): `POST { companyId }` cria na Meta os templates ativos com `metaStatus` `NOT_CREATED` ou `REJECTED` e grava o resultado; `GET ?companyId=` consulta os status e atualiza. Ambos `SUPER_ADMIN`/`COMPANY_ADMIN`, mesma checagem de empresa das outras rotas; `400` se o provedor não for Meta.
 - **`/api/whatsapp/test`**: `POST { phone, companyId }`; segue chamando `sendOrderStatusWhatsApp` com `FINISHED`.
@@ -250,8 +352,8 @@ Seção WhatsApp documenta `WHATSAPP_PROVIDER`, `META_GRAPH_API_VERSION`, `META_
 
 1. `npx prisma db push --config prisma/prisma.config.ts` aplica o schema; `npx tsc --noEmit` e `npm run lint` limpos.
 2. Admin > WhatsApp: criar config Meta para a empresa com IDs e token fictícios. Salva; a resposta e o card não mostram o token (só "…<4 chars>"); `isConnected` já verdadeiro (mock).
-3. Aba Conexão: "Testar conexão" mostra conectado com `5500000000000`. Mensagem de teste para um telefone qualquer devolve sucesso e aparece nos logs.
-4. Aba Templates: 5 templates (inclui Pago) em "Não criado"; "Criar templates na Meta" muda todos para "Aprovado"; texto somente leitura.
+3. Aba Conexão: "Testar conexão" mostra conectado com `5500000000000`. Mensagem de teste **antes** de criar os templates falha com log `FAILED` "Template Meta não aprovado (status NOT_CREATED)".
+4. Aba Templates: 5 templates (inclui Pago) em "Não criado"; "Criar templates na Meta" muda todos para "Aprovado"; texto somente leitura. Mensagem de teste agora devolve sucesso e aparece nos logs.
 5. Criar uma OS: console mostra `[WhatsApp:META_MOCK]` com `os_received_*` e 5 variáveis sem quebras de linha; `MessageLog` `SENT` com `providerMessageId` `mock-*`.
 6. Pausar com motivo: 6 variáveis, a sexta com o motivo. Finalizar: `os_finished_*`.
 7. Marcar como Pago: console mostra upload de `OS_<n>.pdf` e `os_paid_*` com cabeçalho de documento e 3 variáveis.
