@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useSession } from 'next-auth/react'
 import { Button, Input, Textarea, Select, Checkbox, Modal } from '@/components/ui'
 import { serviceOrderSchema, type ServiceOrderFormData, clientSchema, type ClientFormData } from '@/lib/validations'
-import { useCreateOrder, useUpdateOrder, useClients, useServices, useCreateClient } from '@/hooks/api'
+import { useCreateOrder, useUpdateOrder, useClients, useServices, useCreateClient, useStores } from '@/hooks/api'
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, X, UserPlus, Store } from 'lucide-react'
 
@@ -44,9 +44,21 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
   const [showNewClientModal, setShowNewClientModal] = useState(false)
   const [newClientError, setNewClientError] = useState<string | null>(null)
 
-  // Usar a loja do usuário logado ou da ordem existente
-  const storeId = order?.store?.id || userStore?.id || ''
+  // Loja fixa quando editando ou quando o usuário tem loja vinculada;
+  // caso contrário o usuário escolhe a loja num select.
+  const isStoreReadOnly = !!order || !!userStore
+  const initialStoreId = order?.store?.id || userStore?.id || ''
   const storeName = order?.store?.name || userStore?.name || ''
+
+  const emptyServiceItem = {
+    serviceId: '',
+    serviceName: '',
+    description: '',
+    price: 0,
+    quantity: 1,
+    saveGlobally: false,
+    isExisting: false,
+  }
 
   const {
     register,
@@ -61,7 +73,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     resolver: zodResolver(serviceOrderSchema) as any,
     defaultValues: {
       description: order?.description || '',
-      storeId: storeId,
+      storeId: initialStoreId,
       clientId: order?.client?.id || '',
       services: order?.services?.map((s) => ({
         serviceId: '',
@@ -71,21 +83,24 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
         quantity: s.quantity,
         saveGlobally: false,
         isExisting: true, // Marcar como serviço existente na OS
-      })) || [
-        { serviceId: '', serviceName: '', description: '', price: 0, quantity: 1, saveGlobally: false, isExisting: false },
-      ],
+      })) || [emptyServiceItem],
     },
   })
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: 'services',
   })
 
   const watchedServices = watch('services')
+  const storeId = watch('storeId')
 
-  // Fetch clients and services using React Query (usando storeId do usuário)
-  const { data: clientsData } = useClients({ storeId: storeId, limit: 100 })
+  // Lojas disponíveis (só usadas no modo com select; requisição leve, aceita)
+  const { data: storesData } = useStores({ limit: 100 })
+  const stores = storesData?.data || []
+
+  // Fetch clients and services using React Query (filtrados pela loja do form)
+  const { data: clientsData, isSuccess: clientsLoaded } = useClients({ storeId: storeId, limit: 100 })
   const clients = clientsData?.data || []
 
   const { data: servicesData } = useServices({ storeId: storeId, limit: 100 })
@@ -104,9 +119,16 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       phone: '',
       email: '',
       document: '',
-      storeId: storeId,
+      storeId: initialStoreId,
     },
   })
+
+  const openNewClientModal = () => {
+    // O sub-form captura storeId só na montagem; injeta a loja atual ao abrir.
+    resetClientForm({ name: '', phone: '', email: '', document: '', storeId })
+    setNewClientError(null)
+    setShowNewClientModal(true)
+  }
 
   const handleCreateClient = async (data: ClientFormData) => {
     try {
@@ -196,18 +218,35 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
 
       {/* Store Info and Client Selection */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Loja (somente leitura) */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Loja</label>
-          <div className="flex items-center gap-2 h-10 px-3 bg-gray-100 border border-gray-300 rounded-lg">
-            <Store className="w-4 h-4 text-gray-500" />
-            <span className="text-sm text-gray-900">{storeName || 'Nenhuma loja vinculada'}</span>
+        {/* Loja: somente leitura (editando ou usuário com loja) ou select */}
+        {isStoreReadOnly ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Loja</label>
+            <div className="flex items-center gap-2 h-10 px-3 bg-gray-100 border border-gray-300 rounded-lg">
+              <Store className="w-4 h-4 text-gray-500" />
+              <span className="text-sm text-gray-900">{storeName || 'Nenhuma loja vinculada'}</span>
+            </div>
+            <input type="hidden" value={initialStoreId} {...register('storeId')} />
+            {errors.storeId?.message && (
+              <p className="mt-1.5 text-xs text-red-600">{errors.storeId.message}</p>
+            )}
           </div>
-          <input type="hidden" value={storeId} {...register('storeId')} />
-          {errors.storeId?.message && (
-            <p className="mt-1.5 text-xs text-red-600">{errors.storeId.message}</p>
-          )}
-        </div>
+        ) : (
+          <Select
+            label="Loja"
+            options={stores.map((s) => ({ value: s.id, label: s.name }))}
+            placeholder="Selecione a loja"
+            error={errors.storeId?.message}
+            {...register('storeId', {
+              onChange: () => {
+                // Clientes e serviços pertencem à loja anterior
+                setValue('clientId', '')
+                replace([emptyServiceItem])
+                setShowNewService(null)
+              },
+            })}
+          />
+        )}
 
         {/* Cliente */}
         <div>
@@ -216,7 +255,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
               <Select
                 label="Cliente"
                 options={clients.map((c) => ({ value: c.id, label: `${c.name} - ${c.phone}` }))}
-                placeholder="Selecione o cliente"
+                placeholder={storeId ? 'Selecione o cliente' : 'Selecione a loja primeiro'}
                 error={errors.clientId?.message}
                 disabled={!storeId || !!order}
                 {...register('clientId')}
@@ -226,7 +265,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowNewClientModal(true)}
+                onClick={openNewClientModal}
                 className="h-10 px-3"
                 title="Novo Cliente"
               >
@@ -234,6 +273,18 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
               </Button>
             )}
           </div>
+          {!order && storeId && clientsLoaded && clients.length === 0 && (
+            <p className="mt-1.5 text-xs text-gray-500">
+              Nenhum cliente nesta loja.{' '}
+              <button
+                type="button"
+                onClick={openNewClientModal}
+                className="font-medium text-blue-600 hover:text-blue-700 underline"
+              >
+                Cadastrar novo cliente
+              </button>
+            </p>
+          )}
         </div>
       </div>
 
@@ -343,10 +394,11 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                     />
                     <Input
                       label="Preço (R$)"
-                      placeholder="R$ 0,00"
-                      mask="currency"
+                      type="number"
+                      step="0.01"
+                      min="0"
                       error={errors.services?.[index]?.price?.message}
-                      {...register(`services.${index}.price` as const)}
+                      {...register(`services.${index}.price` as const, { valueAsNumber: true })}
                     />
                   </div>
                   <Textarea
@@ -447,14 +499,20 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
         title="Novo Cliente"
         size="md"
       >
-        <form onSubmit={handleSubmitClient(handleCreateClient)} className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            // O modal fica dentro do <form> da OS; sem isso o submit propaga
+            // pela árvore do React e dispara a validação da OS também.
+            e.stopPropagation()
+            handleSubmitClient(handleCreateClient)(e)
+          }}
+          className="space-y-4"
+        >
           {newClientError && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {newClientError}
             </div>
           )}
-
-          <input type="hidden" value={storeId} {...registerClient('storeId')} />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
@@ -466,7 +524,6 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
             <Input
               label="Telefone *"
               placeholder="(00) 00000-0000"
-              mask="phone"
               error={clientErrors.phone?.message}
               {...registerClient('phone')}
             />
@@ -482,7 +539,6 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
             <Input
               label="CPF/CNPJ"
               placeholder="000.000.000-00"
-              mask="cpfCnpj"
               {...registerClient('document')}
             />
           </div>

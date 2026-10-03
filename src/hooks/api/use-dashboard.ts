@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 
-interface DashboardStats {
+export interface DashboardStats {
   ordersReceived: number
   ordersInProgress: number
   ordersPaused: number
@@ -25,6 +25,30 @@ export function useDashboardStats(params: UseDashboardStatsParams = {}) {
     queryKey: ['dashboard-stats', { startDate, endDate }],
     queryFn: async () => {
       const { data } = await axios.get('/api/dashboard/stats', {
+        params: { startDate, endDate },
+      })
+      return data
+    },
+  })
+}
+
+export type ChartGranularity = 'day' | 'month'
+
+export interface DashboardCharts {
+  granularity: ChartGranularity
+  ordersOverTime: { period: string; count: number; revenue: number }[]
+  topServices: { name: string; quantity: number; total: number }[]
+  newClientsByMonth: { period: string; count: number }[]
+  topClients: { id: string; name: string; orders: number; total: number; topServices: string[] }[]
+}
+
+export function useDashboardCharts(params: UseDashboardStatsParams = {}) {
+  const { startDate, endDate } = params
+
+  return useQuery<DashboardCharts>({
+    queryKey: ['dashboard-charts', { startDate, endDate }],
+    queryFn: async () => {
+      const { data } = await axios.get('/api/dashboard/charts', {
         params: { startDate, endDate },
       })
       return data

@@ -4,7 +4,16 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { ClipboardList, Users, Clock, CheckCircle, Play, Plus, DollarSign, Calendar, Inbox, Pause } from 'lucide-react'
 import { Button, Badge, Select } from '@/components/ui'
-import { useDashboardStats, useOrders } from '@/hooks/api'
+import { useDashboardStats, useDashboardCharts, useOrders } from '@/hooks/api'
+import {
+  ChartCard,
+  OrdersByStatusChart,
+  OrdersOverTimeChart,
+  TopServicesChart,
+  TopClientsChart,
+  NewClientsChart,
+  type TimeMeasure,
+} from '@/components/dashboard'
 
 const STATUS_CONFIG = {
   RECEIVED: { label: 'Recebido', variant: 'secondary' as const, icon: Inbox },
@@ -56,6 +65,7 @@ function getDateRange(period: string): { startDate?: string; endDate?: string } 
 
 export default function Dashboard() {
   const [periodFilter, setPeriodFilter] = useState('')
+  const [timeMeasure, setTimeMeasure] = useState<TimeMeasure>('count')
 
   const dateFilters = useMemo(() => getDateRange(periodFilter), [periodFilter])
 
@@ -69,8 +79,27 @@ export default function Dashboard() {
     endDate: dateFilters.endDate,
   })
 
+  const {
+    data: charts,
+    isLoading: chartsLoading,
+    isError: chartsError,
+  } = useDashboardCharts({
+    startDate: dateFilters.startDate,
+    endDate: dateFilters.endDate,
+  })
+
   const recentOrders = ordersData?.data || []
   const isLoading = statsLoading || ordersLoading
+
+  const statusTotal =
+    (stats?.ordersReceived || 0) +
+    (stats?.ordersInProgress || 0) +
+    (stats?.ordersPaused || 0) +
+    (stats?.ordersFinished || 0) +
+    (stats?.ordersPaid || 0)
+  const noOrdersOverTime = !charts || charts.ordersOverTime.every((b) => b.count === 0)
+  const noRevenueOverTime = !charts || charts.ordersOverTime.every((b) => b.revenue === 0)
+  const noNewClients = !charts || charts.newClientsByMonth.every((b) => b.count === 0)
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -160,6 +189,31 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Quick Actions */}
+      <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Ações Rápidas</h2>
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4">
+          <Link href="/orders" className="w-full sm:w-auto">
+            <Button className="w-full sm:w-auto justify-center">
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Ordem de Serviço
+            </Button>
+          </Link>
+          <Link href="/clients" className="w-full sm:w-auto">
+            <Button variant="secondary" className="w-full sm:w-auto justify-center">
+              <Users className="h-4 w-4 mr-2" />
+              Novo Cliente
+            </Button>
+          </Link>
+          <Link href="/services" className="w-full sm:w-auto">
+            <Button variant="outline" className="w-full sm:w-auto justify-center">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Gerenciar Serviços
+            </Button>
+          </Link>
+        </div>
+      </div>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
         {statsCards.map((stat) => {
@@ -223,28 +277,78 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-        <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Ações Rápidas</h2>
-        <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4">
-          <Link href="/orders" className="w-full sm:w-auto">
-            <Button className="w-full sm:w-auto justify-center">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Ordem de Serviço
-            </Button>
-          </Link>
-          <Link href="/clients" className="w-full sm:w-auto">
-            <Button variant="secondary" className="w-full sm:w-auto justify-center">
-              <Users className="h-4 w-4 mr-2" />
-              Novo Cliente
-            </Button>
-          </Link>
-          <Link href="/services" className="w-full sm:w-auto">
-            <Button variant="outline" className="w-full sm:w-auto justify-center">
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Gerenciar Serviços
-            </Button>
-          </Link>
+      {/* Gráficos */}
+      <div>
+        <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Gráficos</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
+          <ChartCard title="OS por status" isEmpty={statusTotal === 0}>
+            {stats && <OrdersByStatusChart stats={stats} />}
+          </ChartCard>
+
+          <ChartCard
+            title="OS ao longo do tempo"
+            subtitle={timeMeasure === 'count' ? 'Quantidade de OS criadas' : 'Faturamento (finalizadas + pagas)'}
+            isLoading={chartsLoading}
+            isError={chartsError}
+            isEmpty={timeMeasure === 'count' ? noOrdersOverTime : noRevenueOverTime}
+            emptyMessage={timeMeasure === 'count' ? 'Sem dados no período' : 'Sem faturamento no período'}
+            action={
+              <div className="flex rounded-lg border border-gray-200 p-0.5 text-xs">
+                {(
+                  [
+                    ['count', 'Quantidade'],
+                    ['revenue', 'Faturamento'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setTimeMeasure(key)}
+                    className={`px-2.5 py-1 rounded-md transition-colors ${
+                      timeMeasure === key ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            {charts && (
+              <OrdersOverTimeChart data={charts.ordersOverTime} granularity={charts.granularity} measure={timeMeasure} />
+            )}
+          </ChartCard>
+
+          <ChartCard
+            title="Serviços mais vendidos"
+            subtitle="Top 5 por quantidade"
+            isLoading={chartsLoading}
+            isError={chartsError}
+            isEmpty={!charts || charts.topServices.length === 0}
+          >
+            {charts && <TopServicesChart data={charts.topServices} />}
+          </ChartCard>
+
+          <ChartCard
+            title="Top clientes"
+            subtitle="Top 5 por número de OS"
+            isLoading={chartsLoading}
+            isError={chartsError}
+            isEmpty={!charts || charts.topClients.length === 0}
+          >
+            {charts && <TopClientsChart data={charts.topClients} />}
+          </ChartCard>
+
+          <ChartCard
+            title="Novos clientes por mês"
+            subtitle="Últimos 6 meses, independente do filtro"
+            isLoading={chartsLoading}
+            isError={chartsError}
+            isEmpty={noNewClients}
+            emptyMessage="Nenhum cliente cadastrado nos últimos 6 meses"
+          >
+            {charts && <NewClientsChart data={charts.newClientsByMonth} />}
+          </ChartCard>
         </div>
       </div>
 
