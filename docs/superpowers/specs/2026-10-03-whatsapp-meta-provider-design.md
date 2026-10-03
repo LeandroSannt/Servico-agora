@@ -25,25 +25,29 @@ Fora da janela de 24h aberta por uma mensagem do **cliente**, a Meta só aceita 
 - Remover o código da Evolution: ele vira um provedor e continua selecionável.
 - Testes automatizados (o projeto não tem runner).
 
+## Ambiente
+
+Node 22 (`engines >=22.12`, `node:22-alpine`). HTTP com axios 1.13 usando `FormData`/`Blob` globais do Node; **não** instalar `form-data`.
+
 ## Banco de dados (`prisma/schema.prisma`)
 
 ```prisma
-enum WhatsAppProvider {
+enum WhatsAppProviderType {
   EVOLUTION
   META
 }
 
 enum MetaTemplateStatus {
   NOT_CREATED  // ainda não enviado à Meta
-  PENDING      // em análise
+  PENDING      // em análise (inclui IN_APPEAL)
   APPROVED
-  REJECTED
+  REJECTED     // inclui DISABLED, PENDING_DELETION, DELETED, LIMIT_EXCEEDED, com o status da Meta em metaRejectReason
   PAUSED       // Meta pausou por qualidade
 }
 
 model WhatsAppConfig {
   // existentes...
-  provider          WhatsAppProvider @default(EVOLUTION)
+  provider          WhatsAppProviderType @default(EVOLUTION)
   // Evolution (passam a opcionais)
   instanceName      String?  @map("instance_name")
   apiKey            String?  @map("api_key")
@@ -52,7 +56,7 @@ model WhatsAppConfig {
   metaPhoneNumberId String?  @map("meta_phone_number_id")
   metaWabaId        String?  @map("meta_waba_id")
   metaAccessToken   String?  @map("meta_access_token")
-  metaAppId         String?  @map("meta_app_id")          // necessário só para criar o template com cabeçalho de documento
+  metaAppId         String?  @map("meta_app_id")   // necessário só para criar o template PAID (cabeçalho de documento)
 }
 
 model MessageTemplate {
@@ -69,121 +73,170 @@ model MessageLog {
 }
 ```
 
-- `triggerStatus` de `MessageTemplate` passa a aceitar `PAID` (o enum `OrderStatus` já tem). O template `PAID` tem cabeçalho de documento e carrega o PDF.
-- Aplicação do schema: `prisma db push` em dev; o `docker-entrypoint.sh` já roda `prisma db push` no deploy. `instanceName`/`apiKey` virarem opcionais não perde dados.
+- `triggerStatus` passa a aceitar `PAID` (o enum `OrderStatus` já tem). O template `PAID` tem cabeçalho de documento e carrega o PDF.
+- Aplicação: `prisma db push` em dev; o `docker-entrypoint.sh` já roda `prisma db push` no deploy. Tornar `instanceName`/`apiKey` opcionais e adicionar colunas com default não perde dados. O enum do Prisma chama-se `WhatsAppProviderType` para não colidir com a interface TypeScript `MessagingProvider`.
+
+## Validações (`src/lib/validations/whatsapp.ts`)
+
+- `whatsappConfigSchema` vira `z.discriminatedUnion('provider', [...])`:
+  - `EVOLUTION`: `instanceName`, `apiKey` (opcional no PUT, ver abaixo), `apiUrl`, `companyId`.
+  - `META`: `metaPhoneNumberId`, `metaWabaId` obrigatórios; `metaAccessToken` obrigatório no POST e opcional no PUT (vazio/ausente mantém o atual); `metaAppId` opcional; `apiUrl` opcional (default do banco); `companyId`.
+  - Para o PUT, usar `whatsappConfigUpdateSchema` = mesma união com `apiKey` e `metaAccessToken` opcionais.
+- `messageTemplateSchema`: `triggerStatus: z.enum(['RECEIVED','IN_PROGRESS','PAUSED','FINISHED','PAID'])`; `content` opcional (o handler exige `min(10)` só quando o config é Evolution); novos campos opcionais `metaTemplateName` (regex `^[a-z0-9_]{1,512}$`) e `metaLanguage`.
+- `defaultTemplates` ganha a entrada `PAID` com o texto atual da legenda de pagamento:
+
+```
+💚 *Pagamento Confirmado!*
+
+Olá, *{{clientName}}*!
+
+Agradecemos pela preferência! Seu pagamento foi confirmado.
+
+📋 *OS:* #{{orderNumber}}
+💰 *Total:* R$ {{totalAmount}}
+
+Segue em anexo o comprovante da sua ordem de serviço.
+
+_{{companyName}}_
+_Obrigado pela confiança!_
+```
+
+`defaultTemplates` de validations passa a ser a **única** fonte dos textos padrão; `generateDefaultMessage` e `defaultTemplates` de `evolution-api.ts` são removidos (onde os títulos divergem, vale o de validations: "Serviço Em Andamento").
 
 ## Camada de provedor (`src/lib/whatsapp/`)
 
 ```
 src/lib/whatsapp/
-  index.ts            # API pública: sendOrderStatusWhatsApp, sendOrderPaidWhatsApp, checkWhatsAppConnection,
-                      #             getWhatsAppQRCode (Evolution), syncMetaTemplates, refreshMetaTemplateStatus
-  types.ts            # WhatsAppProvider interface, OrderStatusMessageData, OrderPaidMessageData, SendResult
-  message-data.ts     # formatPhoneNumber, variáveis por status, sanitizeParam, textos padrão (movidos de evolution-api.ts)
+  index.ts             # API pública: sendOrderStatusWhatsApp, sendOrderPaidWhatsApp, checkWhatsAppConnection,
+                       #   getWhatsAppQRCode, disconnectWhatsApp (Evolution), syncMetaTemplates, refreshMetaTemplateStatus
+  types.ts             # MessagingProvider, TemplateRef, SendResult, OrderStatusMessageData, OrderPaidMessageData
+  message-data.ts      # formatPhoneNumber, buildVariables, renderText, toMetaParams, sanitizeParam, metaTemplateName, metaTemplateBodies
+  resolve-provider.ts  # escolhe o provedor pela config da empresa ou pelo .env global
   providers/
-    evolution.ts      # código atual de envio texto/mídia/conexão/QR, sem regra de negócio
-    meta.ts           # Cloud API: sendTemplate, uploadMedia, checkConnection, createTemplates, getTemplateStatuses
-    meta-mock.ts      # mesma interface, só loga e devolve sucesso com id falso
-  resolve-provider.ts # escolhe provider pela config da empresa ou pelo .env global
+    evolution.ts       # chamadas HTTP à Evolution (texto, mídia, estado, QR, logout), sem regra de negócio
+    meta.ts            # Cloud API: sendTemplate, sendDocumentTemplate, checkConnection, createTemplates, getTemplateStatuses
+    meta-mock.ts       # mesma interface; só loga e devolve sucesso
 ```
 
-### Interface
+### Tipos
 
 ```ts
-interface SendResult { ok: boolean; providerMessageId?: string; error?: string }
+type SendResult = { ok: boolean; providerMessageId?: string; error?: string }
 
-interface WhatsAppProvider {
+type TemplateRef =
+  | { kind: 'text'; text: string }                                  // Evolution: texto já renderizado
+  | { kind: 'meta'; name: string; language: string; params: string[] }  // Meta: template aprovado + variáveis
+
+interface MessagingProvider {
   readonly name: 'EVOLUTION' | 'META' | 'META_MOCK'
-  sendStatusMessage(input: { phone: string; template: TemplateRef; data: OrderStatusMessageData }): Promise<SendResult>
-  sendPaidDocument(input: { phone: string; template: TemplateRef; data: OrderPaidMessageData; pdf: Buffer; fileName: string }): Promise<SendResult>
+  sendMessage(input: { phone: string; template: TemplateRef }): Promise<SendResult>
+  sendDocument(input: { phone: string; template: TemplateRef; pdf: Buffer; fileName: string }): Promise<SendResult>
   checkConnection(): Promise<{ connected: boolean; phoneNumber?: string | null; error?: string }>
+  // Só Evolution (opcionais na interface):
+  getQRCode?(): Promise<string | null>
+  disconnect?(): Promise<void>
+  // Só Meta (opcionais):
+  createTemplates?(defs: MetaTemplateDefinition[]): Promise<MetaTemplateResult[]>
+  getTemplateStatuses?(names: string[]): Promise<Record<string, { status: string; rejectedReason?: string }>>
 }
-// TemplateRef: para Evolution é { content: string } (texto com {{clientName}}...);
-// para Meta é { name: string; language: string }.
 ```
 
-Regras no `index.ts` (iguais às atuais): buscar config da empresa; sem config, usar `.env` global; se config existe e `isConnected` é falso, não envia; escolher template ativo do status; gravar `MessageLog` com `SENT`/`FAILED`, `errorMessage` e `providerMessageId`. A orquestração não sabe qual provedor está por trás.
+### `message-data.ts`
 
-### Resolução do provedor
-
-- Config da empresa com `provider = META` → `MetaProvider` com as credenciais da config (`META_MOCK=true` no `.env` troca por `MetaMockProvider`).
-- Config com `provider = EVOLUTION` → `EvolutionProvider` (comportamento atual).
-- Sem config: `WHATSAPP_PROVIDER` no `.env` (`META` ou `EVOLUTION`, padrão `EVOLUTION`), com `META_PHONE_NUMBER_ID`, `META_WABA_ID`, `META_ACCESS_TOKEN`, `META_APP_ID` ou as `EVOLUTION_*` atuais. Para Meta sem config, os templates globais usam os nomes padrão (abaixo) em `pt_BR`.
-
-### Variáveis por status (ordem fixa)
+- `formatPhoneNumber`: a atual (55 + DDD + número, só dígitos).
+- `buildVariables(data)`: aceita `OrderStatusMessageData | OrderPaidMessageData` e devolve `Record<'clientName'|'orderNumber'|'storeName'|'companyName'|'services'|'totalAmount'|'pausedReason'|'status', string>`.
+- `renderText(content, vars)`: semântica atual de `replaceTemplateVariables` (serviços em várias linhas `  • Nome (2x) - R$ 40.00`, total `toFixed(2)`, `pausedReason` com prefixo `\n📝 *Motivo:* ...\n` ou vazio).
+- `toMetaParams(status, vars): string[]`: ordem da tabela abaixo, cada item por `sanitizeParam` (remove `\r\n\t`, colapsa espaços, `trim`, corta em 1000 chars). Serviços em uma linha: `Nome (2x) R$ 40,00; Outro (1x) R$ 15,00`. Total `1.234,56` (pt-BR, sem "R$").
+- `metaTemplateName(status, companyId)` = `os_<status minúsculo>_<6 últimos chars do companyId>`.
+- `metaTemplateBodies(companyName)`: textos dos 5 templates com `{{n}}` (abaixo) e exemplos.
 
 | Status | {{1}} | {{2}} | {{3}} | {{4}} | {{5}} | {{6}} |
 |---|---|---|---|---|---|---|
 | RECEIVED, IN_PROGRESS, FINISHED | clientName | orderNumber | storeName | services | totalAmount | — |
-| PAUSED | clientName | orderNumber | storeName | services | totalAmount | pausedReason (ou "Não informado") |
-| PAID (cabeçalho: documento PDF) | clientName | orderNumber | totalAmount | — | — | — |
+| PAUSED | clientName | orderNumber | storeName | services | totalAmount | pausedReason ou "Não informado" |
+| PAID (cabeçalho: documento) | clientName | orderNumber | totalAmount | — | — | — |
 
-- `services`: itens separados por "; " no formato `Nome (2x) R$ 40,00`.
-- `totalAmount`: `1.234,56` (pt-BR, sem "R$", pois o "R$" fica no texto fixo).
-- `sanitizeParam`: remove `\r\n\t`, colapsa espaços, `trim`, corta em 1000 caracteres.
-- O nome da empresa entra no texto fixo do template (ele é criado por empresa), não como variável.
+O nome da empresa entra no texto fixo (template é por empresa), não como variável.
 
-### Textos dos templates (criados na Meta)
+### Regras em `index.ts` (as atuais, agora independentes do provedor)
 
-Mesma estrutura dos textos padrão atuais, com `{{n}}` no lugar das variáveis e a lista de serviços numa linha. Nome na Meta: `os_<status_em_minusculo>_<6 últimos chars do companyId>` (ex.: `os_finished_a1b2c3`); apenas `[a-z0-9_]`. Categoria `UTILITY`, idioma `pt_BR`. Exemplo (FINISHED):
+1. Buscar `WhatsAppConfig` da empresa com templates ativos do status. Sem config: provedor global do `.env` (abaixo). Com config e `isConnected = false`: não envia, retorna `false`.
+2. Escolher template:
+   - **Evolution:** template ativo → `renderText(content)`; sem template ativo → `renderText(defaultTemplates[status].content)` (comportamento atual).
+   - **Meta:** template ativo com `metaStatus = APPROVED` → `{ kind: 'meta', name, language, params }`. Template ativo mas não aprovado → não envia; grava `MessageLog FAILED` com `errorMessage = 'Template Meta não aprovado (status <X>)'`. Template inativo ou inexistente → não envia (sem fallback), log `FAILED` com `'Template Meta inativo'`.
+   - **Meta global (sem config):** nome padrão `metaTemplateName(status, 'global')` em `pt_BR`, assumindo aprovado; sem log (não há `whatsappConfigId`).
+3. Chamar `provider.sendMessage` / `provider.sendDocument` (PAID gera o PDF com `generateOrderPdf` e envia `fileName = OS_<n>.pdf`).
+4. Gravar `MessageLog` quando há config: `status` `SENT`/`FAILED`, `errorMessage`, `providerMessageId`, `orderNumber`, `phone` formatado, e `message`:
+   - Evolution: texto enviado (como hoje); PAID: `[PDF] OS_<n>.pdf - <legenda>`.
+   - Meta: `[META <name>/<language>] {{1}}=...; {{2}}=...`; PAID: `[PDF] OS_<n>.pdf [META <name>/<language>] {{1}}=...`.
+5. `checkWhatsAppConnection(companyId?)`: `provider.checkConnection()` e grava `isConnected`/`phoneNumber` na config.
 
-```
-✅ *Serviço Finalizado*
+### Resolução do provedor (`resolve-provider.ts`)
 
-Olá, *{{1}}*!
-
-Seu serviço foi concluído e está pronto para retirada!
-
-📋 *Ordem de Serviço:* #{{2}}
-🏪 *Loja:* {{3}}
-
-*Serviços:* {{4}}
-
-💰 *Total:* R$ {{5}}
-
-🎉 Por favor, compareça à nossa loja para retirar seu produto/serviço.
-
-_<Nome da Empresa>_
-_Mensagem automática - Não responda_
-```
-
-Cada template é enviado com `example.body_text` preenchido (a Meta exige exemplos). O template `PAID` tem componente `HEADER` com `format: DOCUMENT` e `example.header_handle` obtido pelo upload resumível de um PDF de exemplo gerado pelo gerador atual.
+- Config `provider = META` → `MetaProvider(config)`; se `META_MOCK === 'true'`, `MetaMockProvider`.
+- Config `provider = EVOLUTION` → `EvolutionProvider(config)`.
+- Sem config: `WHATSAPP_PROVIDER` (`META` | `EVOLUTION`, padrão `EVOLUTION`) com `META_PHONE_NUMBER_ID`, `META_WABA_ID`, `META_ACCESS_TOKEN`, `META_APP_ID` ou as `EVOLUTION_*` atuais.
 
 ### Provedor Meta (`providers/meta.ts`)
 
-- Base: `https://graph.facebook.com/<versão>`; versão em `META_GRAPH_API_VERSION` (padrão `v21.0`). Header `Authorization: Bearer <token>`. Timeout 30s (60s para mídia).
-- `sendStatusMessage`: `POST /{phoneNumberId}/messages` com `{ messaging_product: 'whatsapp', to, type: 'template', template: { name, language: { code }, components: [{ type: 'body', parameters: [{ type: 'text', text }...] }] } }`. Sucesso quando a resposta traz `messages[0].id`.
-- `sendPaidDocument`: 1) `POST /{phoneNumberId}/media` multipart (`messaging_product=whatsapp`, `type=application/pdf`, `file`) usando `FormData`/`Blob` nativos do Node 18+; 2) `POST /{phoneNumberId}/messages` com componente `header` `[{ type: 'document', document: { id, filename } }]` e `body` com as variáveis.
-- `checkConnection`: `GET /{phoneNumberId}?fields=display_phone_number,verified_name,quality_rating`. Sucesso → `connected: true`, `phoneNumber` = dígitos de `display_phone_number`. Erro 401/190 → `connected: false` com mensagem "Token inválido ou expirado".
-- `createTemplates(templates)`: `POST /{wabaId}/message_templates` por template. Resposta traz `id` e `status`. Se já existir com o mesmo nome (erro código 100 subcódigo 2388024 ou mensagem contendo "already exists"), tratar como criado e consultar status.
-- `getTemplateStatuses(names)`: `GET /{wabaId}/message_templates?fields=name,status,rejected_reason&limit=100`, filtrando pelos nomes.
-- Upload resumível para o `header_handle` do PAID: `POST /{appId}/uploads?file_length&file_type=application/pdf` → `id`; `POST /{uploadSessionId}` com header `Authorization: OAuth <token>`, `file_offset: 0` e corpo binário → `{ h }`. Sem `metaAppId`, o PAID não é criado e o status dele fica `NOT_CREATED` com `metaRejectReason = 'Informe o App ID para criar o template com documento'`.
-- Erros da Meta: extrair `error.message`, `error.code`, `error.error_subcode` e `error.error_data.details` para o `errorMessage` do log.
-- Telefone: mesma `formatPhoneNumber` atual (55 + DDD + número, só dígitos).
+- Base `https://graph.facebook.com/<versão>`; versão em `META_GRAPH_API_VERSION` (padrão `v21.0`). `Authorization: Bearer <token>`. Timeout 30s (60s em mídia). Telefone via `formatPhoneNumber`.
+- **sendMessage** (`kind: 'meta'`): `POST /{phoneNumberId}/messages`
+  ```json
+  { "messaging_product": "whatsapp", "to": "<phone>", "type": "template",
+    "template": { "name": "<name>", "language": { "code": "pt_BR" },
+      "components": [ { "type": "body", "parameters": [ { "type": "text", "text": "<p1>" }, ... ] } ] } }
+  ```
+  Sucesso quando `messages[0].id` existe → `providerMessageId`.
+- **sendDocument**: 1) `POST /{phoneNumberId}/media` multipart com `messaging_product=whatsapp`, `type=application/pdf`, `file=<Blob do PDF>` (nome do arquivo no `append`) → `{ id }`; 2) `POST /{phoneNumberId}/messages` com
+  ```json
+  "components": [
+    { "type": "header", "parameters": [ { "type": "document", "document": { "id": "<mediaId>", "filename": "OS_123.pdf" } } ] },
+    { "type": "body", "parameters": [ { "type": "text", "text": "<p1>" }, ... ] } ]
+  ```
+- **checkConnection**: `GET /{phoneNumberId}?fields=display_phone_number,verified_name,quality_rating`. OK → `{ connected: true, phoneNumber: dígitos de display_phone_number }`. Erro com `error.code === 190` (qualquer HTTP) → `{ connected: false, error: 'Token inválido ou expirado' }`; outros → `error.message` da Meta.
+- **createTemplates(defs)**: para cada def, `POST /{wabaId}/message_templates`:
+  ```json
+  { "name": "os_finished_a1b2c3", "category": "UTILITY", "language": "pt_BR",
+    "components": [ { "type": "BODY", "text": "...{{1}}...{{5}}...",
+      "example": { "body_text": [ ["Maria Silva", "1042", "Loja Centro", "Troca de tela (1x) R$ 350,00", "350,00"] ] } } ] }
+  ```
+  `parameter_format` omitido (posicional). PAID adiciona antes do BODY: `{ "type": "HEADER", "format": "DOCUMENT", "example": { "header_handle": ["<h>"] } }`, com `<h>` do upload resumível. Resposta `{ id, status }`. Se a Meta responder que o nome já existe (`error.error_subcode === 2388024` **ou** mensagem contendo "already exists"), consultar `GET /{wabaId}/message_templates?name=<name>&fields=name,status,rejected_reason` e usar o status retornado.
+- **getTemplateStatuses(names)**: `GET /{wabaId}/message_templates?fields=name,status,rejected_reason&limit=100` (seguir `paging.next` se houver), filtrando pelos nomes. Mapeamento para `MetaTemplateStatus`: `APPROVED→APPROVED`; `PENDING`, `IN_APPEAL→PENDING`; `REJECTED→REJECTED` (`metaRejectReason = rejected_reason`); `PAUSED→PAUSED`; demais (`DISABLED`, `PENDING_DELETION`, `DELETED`, `LIMIT_EXCEEDED`) → `REJECTED` com `metaRejectReason = <status da Meta>`; ausente na listagem → `NOT_CREATED`.
+- **Upload resumível (header_handle do PAID)**: `POST /{appId}/uploads?file_name=exemplo.pdf&file_length=<bytes>&file_type=application/pdf` com `Authorization: OAuth <token>` → `{ id }`; `POST /{uploadSessionId}` com `Authorization: OAuth <token>`, `file_offset: 0`, corpo binário → `{ h }`. O PDF de exemplo vem de `generateOrderPdf` com dados fictícios. Sem `metaAppId`: PAID não é criado, fica `NOT_CREATED` com `metaRejectReason = 'Informe o App ID para criar o template com documento'`.
+- Erros: `errorMessage` = `error.message` + (`error.error_data.details` se houver) + `[code/subcode]`.
 
 ### Mock (`providers/meta-mock.ts`)
 
-Ativado por `META_MOCK=true`. Loga `[WhatsApp:META_MOCK]` com o payload que seria enviado (template, variáveis, nome do arquivo) e devolve `{ ok: true, providerMessageId: 'mock-<timestamp>' }`. `checkConnection` devolve `connected: true, phoneNumber: '5500000000000'`. `createTemplates` devolve status `APPROVED`. Com `META_MOCK` ligado, a tela mostra um aviso "Modo de simulação ativo".
+`META_MOCK=true`. Loga `[WhatsApp:META_MOCK]` com template, variáveis e nome do arquivo; devolve `{ ok: true, providerMessageId: 'mock-<timestamp>' }`. `checkConnection` → `{ connected: true, phoneNumber: '5500000000000' }`. `createTemplates` → todos `APPROVED`; `getTemplateStatuses` → `APPROVED` para todos.
 
 ## API
 
-- `POST /api/whatsapp/config`: aceita `provider` e campos da Meta. Validação Zod: se `META`, exigem-se `metaPhoneNumberId`, `metaWabaId`, `metaAccessToken`; se `EVOLUTION`, `instanceName`, `apiKey`, `apiUrl`. Templates padrão criados como hoje, mais o `PAID`; para Meta, `metaTemplateName` já preenchido com o nome padrão e `metaStatus = NOT_CREATED`.
-- `PUT /api/whatsapp/config`: mesmos campos. Trocar o provedor zera `isConnected` e `phoneNumber`.
-- `GET /api/whatsapp/config`: **nunca devolve** `metaAccessToken` nem `apiKey` em claro; devolve `hasMetaAccessToken: boolean` e os 4 últimos caracteres (`metaAccessTokenHint`). No `PUT`, token vazio ou ausente mantém o atual.
-- `POST /api/whatsapp/qrcode` (verificar conexão): usa `provider.checkConnection()`; grava `isConnected`/`phoneNumber`. `GET` (QR) e `DELETE` (desconectar) respondem `400 { error: 'Operação disponível apenas para o provedor Evolution' }` quando o provedor é Meta.
-- `POST /api/whatsapp/templates/sync` (novo): cria na Meta os templates ativos ainda `NOT_CREATED`/`REJECTED` e atualiza `metaStatus`. `GET /api/whatsapp/templates/sync?companyId=` consulta os status na Meta e atualiza o banco. Ambos exigem `SUPER_ADMIN`/`COMPANY_ADMIN` e respeitam a empresa.
-- `PUT /api/whatsapp/templates`: com provedor Meta, ignora `content` (texto fica na Meta) e aceita `isActive` e `metaTemplateName`.
-- `POST /api/whatsapp/test`: continua chamando `sendOrderStatusWhatsApp` com status `FINISHED`.
-- `GET /api/whatsapp/status` (rota global sem empresa): usa o provedor global do `.env`; `qrCode` só quando Evolution.
+- **`/api/whatsapp/config`**
+  - `GET`: `null` sem config; senão `{ ...sanitizeConfig(config), mock: META_MOCK === 'true' }`. `sanitizeConfig` remove `metaAccessToken` e `apiKey` e adiciona `hasMetaAccessToken`, `metaAccessTokenHint` (4 últimos chars) e `hasApiKey`. `POST` e `PUT` também devolvem `sanitizeConfig`.
+  - `POST`: valida com a união; cria config e os **5** templates de `defaultTemplates` (`isDefault = true`); para Meta, `metaTemplateName = metaTemplateName(status, companyId)`, `metaStatus = NOT_CREATED`. Com `provider = META`, chama `checkConnection()` e persiste `isConnected`/`phoneNumber`.
+  - `PUT`: valida com `whatsappConfigUpdateSchema`; `metaAccessToken`/`apiKey` vazios mantêm o atual. Trocar o provedor zera `isConnected`/`phoneNumber`. Com `provider = META`: garante os 5 templates (cria os ausentes de `defaultTemplates`), preenche `metaTemplateName` nulo e chama `checkConnection()`. Voltar para EVOLUTION mantém os templates.
+- **`/api/whatsapp/qrcode`**
+  - `POST` (verificar conexão): sempre `200 { connected, state: 'open' | 'disconnected', phoneNumber?, error? }`, via `checkWhatsAppConnection(companyId)`.
+  - `GET` (QR) e `DELETE` (desconectar): com Meta → `400 { error: 'Operação disponível apenas para o provedor Evolution' }`; com Evolution → via provedor, como hoje.
+- **`/api/whatsapp/templates`**: `PUT` com Meta ignora `content` e aceita `isActive`, `metaTemplateName`, `metaLanguage`; com Evolution, `content` obrigatório (`min 10`).
+- **`/api/whatsapp/templates/sync`** (novo): `POST { companyId }` cria na Meta os templates ativos com `metaStatus` `NOT_CREATED` ou `REJECTED` e grava o resultado; `GET ?companyId=` consulta os status e atualiza. Ambos `SUPER_ADMIN`/`COMPANY_ADMIN`, mesma checagem de empresa das outras rotas; `400` se o provedor não for Meta.
+- **`/api/whatsapp/test`**: `POST { phone, companyId }`; segue chamando `sendOrderStatusWhatsApp` com `FINISHED`.
+- **`/api/whatsapp/status`** (global): usa o provedor do `.env`; inclui `mock` e só traz `qrCode` com Evolution.
+
+## Hooks (`src/hooks/api/use-whatsapp.ts`)
+
+- Tipo `WhatsAppConfig`: perde `apiKey`; ganha `provider`, `metaPhoneNumberId`, `metaWabaId`, `metaAppId`, `hasMetaAccessToken`, `metaAccessTokenHint`, `hasApiKey`, `mock`.
+- Tipo `MessageTemplate`: ganha `metaTemplateName`, `metaLanguage`, `metaStatus`, `metaRejectReason`.
+- `ConnectionStatusResponse` ganha `error?`.
+- Novos: `useSyncMetaTemplates()` (POST sync), `useRefreshMetaTemplateStatus()` (GET sync). `useTestWhatsAppMessage` passa a enviar `{ phone, companyId }`.
 
 ## Tela de administração (`src/app/(authenticated)/admin/whatsapp/page.tsx`)
 
-- Modal de configuração ganha um seletor de provedor. Com Meta: campos Phone Number ID, WABA ID, App ID (opcional, com ajuda "necessário para o template de OS paga com PDF") e Token de acesso (campo `password`, placeholder "•••• <hint>" quando já existe). Com Evolution: comportamento atual.
-- Aba "Configuração": card mostra o provedor e os IDs da Meta (token nunca aparece).
-- Aba "QR Code" renomeada para "Conexão". Com Meta: botão "Testar conexão" (chama o `POST /qrcode`), mostra número verificado e status; sem QR nem Desconectar. Com Evolution: igual a hoje.
-- Aba "Templates", com Meta: cada card mostra nome na Meta, idioma, badge de status (`Não criado`, `Em análise`, `Aprovado`, `Rejeitado` com motivo, `Pausado`) e o texto como **pré-visualização somente leitura** (texto padrão com `{{n}}`); botão de editar texto some; aviso "O texto é editado no Meta Business Manager; após alterar, atualize o status aqui". Botões no topo: "Criar templates na Meta" e "Atualizar status". Ativar/desativar continua.
-- Banner "Modo de simulação ativo (META_MOCK)" quando a rota de config devolver `mock: true`.
-- Hooks novos em `use-whatsapp.ts`: `useSyncMetaTemplates`, `useRefreshMetaTemplateStatus`; os existentes passam a enviar/receber os novos campos.
+- Modal de configuração: seletor "Provedor" (Evolution | Meta). Com Meta: campos Phone Number ID, WABA ID, App ID (opcional, ajuda: "necessário para o template de OS paga com PDF") e Token de acesso (`type="password"`, placeholder `•••• <hint>` quando já existe; vazio mantém). Com Evolution: comportamento atual (instância gerada, chave do ambiente).
+- Aba "Configuração": card mostra provedor e, com Meta, Phone Number ID, WABA ID, App ID e "Token: configurado (…abcd)". Token nunca aparece inteiro.
+- Aba "QR Code" vira "Conexão". Com Meta: botão "Testar conexão" (POST `/qrcode`); mostra número verificado e status, e `error` em vermelho quando `connected = false`; sem QR nem Desconectar. Abaixo, "Mensagem de teste": campo telefone + botão que chama `POST /api/whatsapp/test` com `{ phone, companyId }` e mostra o resultado. Com Evolution: QR e Desconectar como hoje, mais a mesma caixa de mensagem de teste.
+- Aba "Templates", com Meta: botões no topo "Criar templates na Meta" e "Atualizar status". Cada card mostra `metaTemplateName`, idioma, badge de `metaStatus` (`Não criado`, `Em análise`, `Aprovado`, `Rejeitado` + motivo, `Pausado`) e a pré-visualização **somente leitura** do texto com `{{n}}` (`metaTemplateBodies`); sem botão de editar texto; aviso "O texto é editado no Meta Business Manager; após alterar, clique em Atualizar status". Ativar/desativar continua. Com Evolution: como hoje, agora com 5 templates (inclui Pago).
+- Banner "Modo de simulação ativo (META_MOCK)" quando `config?.mock` for `true` ou, sem config, quando `GET /api/whatsapp/status` devolver `mock: true`.
 
 ## Rotas de OS
 
@@ -191,17 +244,17 @@ Ativado por `META_MOCK=true`. Loga `[WhatsApp:META_MOCK]` com o payload que seri
 
 ## `.env.example`
 
-Seção WhatsApp passa a documentar `WHATSAPP_PROVIDER`, `META_GRAPH_API_VERSION`, `META_PHONE_NUMBER_ID`, `META_WABA_ID`, `META_ACCESS_TOKEN`, `META_APP_ID`, `META_MOCK`, mantendo as `EVOLUTION_*`. As variáveis `NEXT_PUBLIC_EVOLUTION_*` continuam para o fluxo Evolution.
+Seção WhatsApp documenta `WHATSAPP_PROVIDER`, `META_GRAPH_API_VERSION`, `META_PHONE_NUMBER_ID`, `META_WABA_ID`, `META_ACCESS_TOKEN`, `META_APP_ID`, `META_MOCK`, mantém as `EVOLUTION_*` e **adiciona** `NEXT_PUBLIC_EVOLUTION_API_URL`/`NEXT_PUBLIC_EVOLUTION_API_KEY` (hoje usadas pela tela, mas ausentes do exemplo).
 
-## Verificação (manual, com `META_MOCK=true`)
+## Verificação (manual, com `META_MOCK=true` no `.env`)
 
-1. `npx prisma db push` aplica o schema sem erro; `npx tsc --noEmit` e `npm run lint` limpos.
-2. Admin > WhatsApp: criar config Meta para a empresa com IDs fictícios e token fictício. Config salva; `GET` não expõe o token.
-3. Aba Conexão: "Testar conexão" marca conectado com o número do mock.
-4. Aba Templates: 5 templates (inclui Pago) em "Não criado"; "Criar templates na Meta" muda todos para "Aprovado" (mock); texto em somente leitura.
-5. Criar uma OS: log `[WhatsApp:META_MOCK]` com template `os_received_*` e 5 variáveis sem quebras de linha; `MessageLog` com `SENT` e `providerMessageId` `mock-*`.
-6. Mudar status para Pausado com motivo: variável 6 preenchida. Finalizado: template `os_finished_*`.
-7. Marcar como Pago: log mostra upload de `OS_<n>.pdf` e template `os_paid_*` com cabeçalho de documento.
-8. Aba Logs lista as mensagens. Mensagem de teste devolve sucesso.
-9. Trocar provedor para Evolution na config: QR Code volta a aparecer; fluxo Evolution inalterado (sem servidor Evolution local, a verificação é só de tela).
-10. Desligar `META_MOCK` e, sem token real, "Testar conexão" devolve erro legível de token inválido.
+1. `npx prisma db push --config prisma/prisma.config.ts` aplica o schema; `npx tsc --noEmit` e `npm run lint` limpos.
+2. Admin > WhatsApp: criar config Meta para a empresa com IDs e token fictícios. Salva; a resposta e o card não mostram o token (só "…<4 chars>"); `isConnected` já verdadeiro (mock).
+3. Aba Conexão: "Testar conexão" mostra conectado com `5500000000000`. Mensagem de teste para um telefone qualquer devolve sucesso e aparece nos logs.
+4. Aba Templates: 5 templates (inclui Pago) em "Não criado"; "Criar templates na Meta" muda todos para "Aprovado"; texto somente leitura.
+5. Criar uma OS: console mostra `[WhatsApp:META_MOCK]` com `os_received_*` e 5 variáveis sem quebras de linha; `MessageLog` `SENT` com `providerMessageId` `mock-*`.
+6. Pausar com motivo: 6 variáveis, a sexta com o motivo. Finalizar: `os_finished_*`.
+7. Marcar como Pago: console mostra upload de `OS_<n>.pdf` e `os_paid_*` com cabeçalho de documento e 3 variáveis.
+8. Desativar o template de Recebido e criar outra OS: nenhuma mensagem; log `FAILED` "Template Meta inativo".
+9. Trocar provedor para Evolution na config: aba Conexão volta a mostrar QR Code; templates continuam (5). Sem servidor Evolution local, a verificação é só de tela.
+10. Desligar `META_MOCK`, manter token fictício: "Testar conexão" mostra erro legível vindo da Meta (código 190) e `isConnected` fica falso.
