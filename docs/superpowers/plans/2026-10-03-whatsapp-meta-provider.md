@@ -96,9 +96,12 @@ export interface MetaTemplateDefinition {
 }
 export interface MetaTemplateResult { name: string; status: string; rejectedReason?: string; error?: string }
 export type ConnectionResult = { connected: boolean; phoneNumber?: string | null; error?: string }
+export type TemplateVars = Record<
+  'clientName' | 'orderNumber' | 'storeName' | 'companyName' | 'services' | 'servicesMultiline' |
+  'totalAmount' | 'totalAmountFixed' | 'pausedReason' | 'pausedReasonBlock' | 'status', string>
 ```
 
-Mover para cá `OrderStatusMessageData` e `OrderPaidMessageData` (iguais aos de `evolution-api.ts`).
+Mover para cá `OrderStatusMessageData` e `OrderPaidMessageData` (iguais aos de `evolution-api.ts`). `types.ts` e `message-data.ts` são importados pela página (client): usar `import type { OrderStatus } from '@prisma/client'` e nunca importar `@/lib/prisma` neles; `Buffer` só como tipo.
 
 - [ ] **Step 2: `message-data.ts`** — `formatPhoneNumber` (copiar), `buildVariables`, `renderText`, `toMetaParams`, `sanitizeParam`, `metaTemplateName`, `metaTemplateBodies`, `META_PARAM_ORDER`:
 
@@ -220,6 +223,8 @@ Exportar `mapMetaStatus(status: string): MetaTemplateStatus` (mapeamento do spec
 
 ```ts
 export function providerForConfig(config: WhatsAppConfig): MessagingProvider
+// Evolution: new EvolutionProvider({ apiUrl: config.apiUrl, apiKey: config.apiKey ?? '', instanceName: config.instanceName ?? '' })
+// Meta: isMetaMock() ? new MetaMockProvider() : new MetaProvider({ phoneNumberId: config.metaPhoneNumberId ?? '', wabaId: config.metaWabaId ?? '', accessToken: config.metaAccessToken ?? '', appId: config.metaAppId ?? undefined, apiVersion: process.env.META_GRAPH_API_VERSION || 'v21.0' })
 export function globalProvider(): MessagingProvider | null   // null se o .env não tem credenciais do provedor escolhido
 export const isMetaMock = () => process.env.META_MOCK === 'true'
 ```
@@ -243,14 +248,17 @@ export async function sendOrderPaidWhatsApp(data: OrderPaidMessageData): Promise
 export async function checkWhatsAppConnection(companyId?: string): Promise<ConnectionResult>  // grava isConnected/phoneNumber
 export async function getWhatsAppQRCode(companyId: string): Promise<string | null>           // 'EVOLUTION' only
 export async function disconnectWhatsApp(companyId: string): Promise<void>
-export async function syncMetaTemplates(configId: string): Promise<MetaTemplateResult[]>     // cria NOT_CREATED/REJECTED ativos, grava metaStatus
+export async function syncMetaTemplates(configId: string): Promise<MetaTemplateResult[]>
+//   cria NOT_CREATED/REJECTED ativos e grava metaStatus. Gera examplePdf com generateOrderPdf (dados fictícios) só se
+//   config.metaAppId; sem App ID, não envia a def PAID e grava metaStatus NOT_CREATED,
+//   metaRejectReason 'Informe o App ID para criar o template com documento'.
 export async function refreshMetaTemplateStatus(configId: string): Promise<void>
 export type { OrderStatusMessageData, OrderPaidMessageData } from './types'
 ```
 
-`resolveTemplateRef`: Evolution → `{ kind: 'text', text: renderText(template?.isActive ? template.content : defaultTemplates[status].content, vars) }`; Meta → exige `template?.isActive` e `metaStatus === 'APPROVED'`, senão `blocked` com as mensagens do spec. `describeTemplate` gera o `message` do log (formatos do spec). PAID: `fileName = OS_${orderNumber}.pdf`, Evolution `caption` = texto renderizado do template PAID.
+`resolveTemplateRef`: Evolution → `{ kind: 'text', text: renderText(template?.isActive ? template.content : defaultTemplates[status].content, vars) }`; Meta → exige `template?.isActive` e `metaStatus === 'APPROVED'`, senão `blocked` com as mensagens do spec. `describeTemplate` gera o `message` do log (formatos do spec); no log bloqueado sem linha de template, usar `metaTemplateName(status, config.companyId)` e `'pt_BR'`. `getWhatsAppQRCode` grava `isConnected: false` quando devolve um QR (como a rota faz hoje). PAID: `fileName = OS_${orderNumber}.pdf`, Evolution `caption` = texto renderizado do template PAID.
 
-- [ ] **Step 5: Apagar `evolution-api.ts`; trocar imports nas rotas de OS.** `grep -rn "evolution-api" src` deve retornar vazio.
+- [ ] **Step 5: Apagar `evolution-api.ts`; trocar imports nas rotas de OS e também em `whatsapp/status/route.ts` e `whatsapp/test/route.ts`** (`checkWhatsAppConnection`/`getWhatsAppQRCode` mudam de assinatura; ajuste final na Task 4). `grep -rn "evolution-api" src` deve retornar vazio.
 - [ ] **Step 6: `npx tsc --noEmit`** — restam só os erros das rotas de WhatsApp (Task 4).
 - [ ] **Step 7: Commit** `feat(whatsapp): provedor Meta, mock e orquestração independente de provedor`.
 
@@ -265,7 +273,7 @@ export type { OrderStatusMessageData, OrderPaidMessageData } from './types'
 - [ ] **Step 1: `config/route.ts`** — `sanitizeConfig(config)`; GET devolve `{ ...sanitizeConfig(config), mock: isMetaMock() }` ou `null`; POST com `whatsappConfigSchema`, cria os 5 templates (`metaTemplateName` para Meta), e com Meta chama `checkWhatsAppConnection(companyId)`; PUT com `whatsappConfigUpdateSchema` + regras de segredo (400 "Token de acesso é obrigatório"/"API Key é obrigatória"), zera conexão ao trocar provedor, garante 5 templates e `metaTemplateName`, chama `checkConnection` quando Meta. Erros Zod: `error instanceof z.ZodError` → 400 com `issues`.
 - [ ] **Step 2: `qrcode/route.ts`** — GET: guardas atuais; se `config.provider !== 'EVOLUTION'` → 400 "Operação disponível apenas para o provedor Evolution"; senão `getWhatsAppQRCode(companyId)`; se `null`, reconsulta `checkWhatsAppConnection` e devolve `connected` ou 500 "Não foi possível gerar o QR Code". POST: guardas + `checkWhatsAppConnection(companyId)` → 200 `{ connected, state: connected ? 'open' : 'disconnected', phoneNumber, error }`. DELETE: guardas + 400 para Meta; `disconnectWhatsApp`.
 - [ ] **Step 3: `status/route.ts`** — `const provider = globalProvider()`; sem provedor → `{ connected: false, qrCode: null, mock, message: 'WhatsApp não configurado' }`; senão `checkConnection()` e `qrCode` só via `ensureInstanceAndGetQRCode?.()`.
-- [ ] **Step 4: `templates/route.ts`** — POST/PUT: carregar config; se Evolution e `content` com menos de 10 chars → 400 "Conteúdo deve ter pelo menos 10 caracteres"; se Meta, ignorar `content` e aceitar `metaTemplateName`/`metaLanguage` (ao mudar o nome, `metaStatus = NOT_CREATED`).
+- [ ] **Step 4: `templates/route.ts`** — POST: validar com `messageTemplateSchema`, carregar config; se Evolution e `content` com menos de 10 chars → 400 "Conteúdo deve ter pelo menos 10 caracteres"; montar `data` explicitamente porque `content` é obrigatório no Prisma: `const { content, ...rest } = validatedData; create({ data: { ...rest, content: content ?? defaultTemplates[rest.triggerStatus].content } })`. PUT: validar `body` com `messageTemplateSchema.partial()` (hoje o body cru é espalhado); se Meta, ignorar `content` e aceitar `metaTemplateName`/`metaLanguage` (ao mudar o nome, `metaStatus = NOT_CREATED`); se Evolution, aplicar a mesma regra de 10 chars quando `content` vier.
 - [ ] **Step 5: `templates/sync/route.ts`** — POST `{ companyId }` → guardas (400/403/404), 400 se não Meta, `syncMetaTemplates(config.id)` → `{ results }`. GET `?companyId=` → `refreshMetaTemplateStatus(config.id)` → templates atualizados.
 - [ ] **Step 6: `test/route.ts`** — passar `companyId: body.companyId` (string vazia continua caindo no global).
 - [ ] **Step 7: `npx tsc --noEmit`** — Expected: sem erros.
@@ -278,7 +286,7 @@ export type { OrderStatusMessageData, OrderPaidMessageData } from './types'
 **Files:**
 - Modify: `src/hooks/api/use-whatsapp.ts`
 
-- [ ] **Step 1:** Tipos conforme seção "Hooks" do spec (exportar `WhatsAppConfig`, `MessageTemplate`, `MetaTemplateStatus`-like union). `useCreateWhatsAppConfig`/`useUpdateWhatsAppConfig` recebem `WhatsAppConfigFormData` / `WhatsAppConfigUpdateData & { id: string }` de `@/lib/validations`. `useUpdateMessageTemplate` aceita `metaTemplateName`, `metaLanguage`. Novos `useSyncMetaTemplates()` e `useRefreshMetaTemplateStatus()` (invalidam `whatsapp-config`). `useTestWhatsAppMessage` envia `{ phone, companyId }`. `ConnectionStatusResponse.error?`.
+- [ ] **Step 1:** Tipos conforme seção "Hooks" do spec (exportar `WhatsAppConfig`, `MessageTemplate`, `MetaTemplateStatus`-like union). `useCreateWhatsAppConfig`/`useUpdateWhatsAppConfig` recebem `WhatsAppConfigFormData` / `WhatsAppConfigUpdateData & { id: string }` de `@/lib/validations`. `useUpdateMessageTemplate` aceita `metaTemplateName`, `metaLanguage`. Novos `useSyncMetaTemplates()` e `useRefreshMetaTemplateStatus()` (invalidam `whatsapp-config`). `useTestWhatsAppMessage` envia `{ phone, companyId }`. `ConnectionStatusResponse.error?`. `WhatsAppStatus` (legacy) ganha `mock?: boolean` e `error?: string`.
 - [ ] **Step 2: `npx tsc --noEmit`** — vai apontar a página (Task 6). Commit `feat(whatsapp): hooks para provedor Meta`.
 
 ---
@@ -292,7 +300,7 @@ export type { OrderStatusMessageData, OrderPaidMessageData } from './types'
 - [ ] **Step 2: Modal** — `Select` "Provedor" + campos Meta (`Input` `type="password"` para o token, placeholder `•••• ${config?.metaAccessTokenHint ?? ''}` quando `hasMetaAccessToken`) ou o resumo Evolution atual.
 - [ ] **Step 3: Aba Configuração** — card com provedor e IDs da Meta ("Token: configurado (…abcd)").
 - [ ] **Step 4: Aba Conexão** — `isMeta = config?.provider === 'META'`. Meta: botão "Testar conexão" (`checkConnection.mutateAsync`), número e `error` em vermelho; sem QR/Desconectar. Caixa "Mensagem de teste" (campo telefone + botão, `useTestWhatsAppMessage` com `companyId`) para ambos os provedores, exibindo `message`/`error` do retorno.
-- [ ] **Step 5: Aba Templates** — Meta: botões "Criar templates na Meta" e "Atualizar status"; cards com `metaTemplateName`, idioma, badge de `metaStatus` (cores: NOT_CREATED cinza, PENDING amarelo, APPROVED verde, REJECTED vermelho + `metaRejectReason`, PAUSED laranja) e pré-visualização somente leitura de `metaTemplateBodies(selectedCompany.name)[triggerStatus].text` (função pura, importável no client); sem botão editar; aviso do spec. Evolution: como hoje.
+- [ ] **Step 5: Aba Templates** — Meta: botões "Criar templates na Meta" e "Atualizar status"; cards com `metaTemplateName`, idioma, badge de `metaStatus` (cores: NOT_CREATED cinza, PENDING amarelo, APPROVED verde, REJECTED vermelho + `metaRejectReason`, PAUSED laranja) e pré-visualização somente leitura de `metaTemplateBodies(selectedCompany?.name ?? '')[triggerStatus].text` (função pura, importável no client); sem botão editar; aviso do spec. Evolution: como hoje.
 - [ ] **Step 6: Banner mock** — `config?.mock` ou `useWhatsAppStatus().data?.mock` → faixa amarela "Modo de simulação ativo (META_MOCK): nenhuma mensagem é enviada à Meta".
 - [ ] **Step 7: `npx tsc --noEmit`** — Expected: sem erros. Commit `feat(whatsapp): tela de administração com provedor Meta`.
 
