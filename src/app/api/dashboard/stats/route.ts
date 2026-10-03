@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
-import { requireAuth, getCompanyFilter, getStoreFilter } from '@/lib/auth-utils'
+import { requireAuth } from '@/lib/auth-utils'
+import { getDashboardScope } from '@/lib/dashboard-scope'
 
 // GET /api/dashboard/stats - Buscar estatísticas do dashboard
 export async function GET(request: NextRequest) {
@@ -12,25 +14,10 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
-    // Construir filtro baseado no role do usuário
-    const storeFilter = getStoreFilter(user!)
-    let orderWhere: Record<string, unknown> = { ...storeFilter }
-    let clientWhere: Record<string, unknown> = { ...storeFilter }
-
-    // Se SUPER_ADMIN ou COMPANY_ADMIN, filtra por company
-    if (['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(user!.role)) {
-      const companyFilter = getCompanyFilter(user!)
-      if (companyFilter.companyId) {
-        orderWhere = { store: { companyId: companyFilter.companyId } }
-        clientWhere = { store: { companyId: companyFilter.companyId } }
-      } else {
-        orderWhere = {}
-        clientWhere = {}
-      }
-    }
+    const { orderWhere: scopeWhere, clientWhere } = getDashboardScope(user!)
 
     // Filtro por período
-    const dateFilter: Record<string, Date> = {}
+    const dateFilter: { gte?: Date; lt?: Date } = {}
     if (startDate) {
       dateFilter.gte = new Date(startDate)
     }
@@ -40,9 +27,8 @@ export async function GET(request: NextRequest) {
       dateFilter.lt = end
     }
 
-    if (Object.keys(dateFilter).length > 0) {
-      orderWhere.createdAt = dateFilter
-    }
+    const orderWhere: Prisma.ServiceOrderWhereInput =
+      Object.keys(dateFilter).length > 0 ? { ...scopeWhere, createdAt: dateFilter } : scopeWhere
 
     const [ordersReceived, ordersInProgress, ordersPaused, ordersFinished, ordersPaid, totalClients, revenueFinished, revenuePaid] = await Promise.all([
       prisma.serviceOrder.count({ where: { ...orderWhere, status: 'RECEIVED' } }),
