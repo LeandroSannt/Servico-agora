@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       orderNumber: 'TESTE-001',
       storeName: 'Loja Teste',
       companyName: 'Serviço Agora',
-      companyId: body.companyId || '',
+      companyId: body.companyId || '', // vazio = provedor global do .env
       status: 'FINISHED',
       services: [
         { name: 'Serviço de Teste', price: 100.0, quantity: 1 },

@@ -32,6 +32,11 @@ interface GraphTemplate {
   rejected_reason?: string
 }
 
+interface TemplatePage {
+  data?: GraphTemplate[]
+  paging?: { next?: string }
+}
+
 const TEMPLATE_EXISTS_SUBCODE = 2388024
 
 // Mapeia o status bruto da Meta para o enum do banco
@@ -263,11 +268,11 @@ export class MetaProvider implements MessagingProvider {
     let params: Record<string, unknown> | undefined = { fields: 'name,status,rejected_reason', limit: 100 }
 
     while (url) {
-      const response = await this.http.get<{ data?: GraphTemplate[]; paging?: { next?: string } }>(url, { params })
-      for (const t of response.data?.data ?? []) {
+      const page = (await this.http.get(url, { params })).data as TemplatePage | undefined
+      for (const t of page?.data ?? []) {
         if (wanted.has(t.name)) result[t.name] = { status: t.status, rejectedReason: t.rejected_reason }
       }
-      url = response.data?.paging?.next ?? null
+      url = page?.paging?.next ?? null
       params = undefined // o link "next" já traz os parâmetros
     }
 
