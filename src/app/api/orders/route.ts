@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma'
 import { serviceOrderSchema } from '@/lib/validations'
 import { generateOrderNumber } from '@/lib/utils'
 import { requireAuth, getCompanyFilter } from '@/lib/auth-utils'
-import { sendOrderStatusWhatsApp } from '@/lib/whatsapp/evolution-api'
+import { sendOrderStatusWhatsApp } from '@/lib/whatsapp'
 
 // GET /api/orders - Listar ordens de serviço
 export async function GET(request: NextRequest) {

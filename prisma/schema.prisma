@@ -228,11 +228,34 @@ model OrderService {
 // ==================== WHATSAPP ====================
 
 // Configuração WhatsApp por Company
+enum WhatsAppProviderType {
+  EVOLUTION
+  META
+}
+
+enum MetaTemplateStatus {
+  NOT_CREATED // ainda não enviado à Meta
+  PENDING     // em análise (inclui IN_APPEAL)
+  APPROVED
+  REJECTED    // inclui DISABLED, PENDING_DELETION, DELETED, LIMIT_EXCEEDED (status da Meta em metaRejectReason)
+  PAUSED      // Meta pausou por qualidade
+}
+
 model WhatsAppConfig {
   id           String  @id @default(cuid())
-  instanceName String  @map("instance_name")
-  apiKey       String  @map("api_key")
+  provider     WhatsAppProviderType @default(EVOLUTION)
+
+  // Evolution API
+  instanceName String? @map("instance_name")
+  apiKey       String? @map("api_key")
   apiUrl       String  @default("http://localhost:8080") @map("api_url")
+
+  // Meta (WhatsApp Cloud API)
+  metaPhoneNumberId String? @map("meta_phone_number_id")
+  metaWabaId        String? @map("meta_waba_id")
+  metaAccessToken   String? @map("meta_access_token")
+  metaAppId         String? @map("meta_app_id") // necessário só para criar o template PAID (cabeçalho de documento)
+
   isConnected  Boolean @default(false) @map("is_connected")
   phoneNumber  String? @map("phone_number")
 
@@ -266,6 +289,12 @@ model MessageTemplate {
   isActive    Boolean @default(true) @map("is_active")
   isDefault   Boolean @default(false) @map("is_default")
 
+  // Meta: template aprovado correspondente
+  metaTemplateName String?            @map("meta_template_name")
+  metaLanguage     String             @default("pt_BR") @map("meta_language")
+  metaStatus       MetaTemplateStatus @default(NOT_CREATED) @map("meta_status")
+  metaRejectReason String?            @map("meta_reject_reason")
+
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -288,6 +317,9 @@ model MessageLog {
 
   // Referência à OS (opcional)
   orderNumber String? @map("order_number")
+
+  // ID da mensagem no provedor (ex.: wamid da Meta), para webhooks futuros
+  providerMessageId String? @map("provider_message_id")
 
   // Timestamps
   sentAt      DateTime? @map("sent_at")

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sendOrderStatusWhatsApp } from '@/lib/whatsapp/evolution-api'
+import { sendOrderStatusWhatsApp } from '@/lib/whatsapp'
 import { requireRoles } from '@/lib/auth-utils'
 
 // POST /api/whatsapp/test - Enviar mensagem de teste
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       orderNumber: 'TESTE-001',
       storeName: 'Loja Teste',
       companyName: 'Serviço Agora',
-      companyId: body.companyId || '',
+      companyId: body.companyId || '', // vazio = provedor global do .env
       status: 'FINISHED',
       services: [
         { name: 'Serviço de Teste', price: 100.0, quantity: 1 },

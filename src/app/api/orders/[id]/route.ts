@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { updateOrderStatusSchema, serviceOrderSchema } from '@/lib/validations'
 import { sendOrderFinishedEmail } from '@/lib/email/send-email'
-import { sendOrderStatusWhatsApp, sendOrderPaidWhatsApp } from '@/lib/whatsapp/evolution-api'
+import { sendOrderStatusWhatsApp, sendOrderPaidWhatsApp } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/auth-utils'
 
 // GET /api/orders/[id] - Buscar ordem por ID
