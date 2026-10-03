@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sendOrderStatusWhatsApp } from '@/lib/whatsapp/evolution-api'
+import { sendOrderStatusWhatsApp } from '@/lib/whatsapp'
 import { requireRoles } from '@/lib/auth-utils'
 
 // POST /api/whatsapp/test - Enviar mensagem de teste

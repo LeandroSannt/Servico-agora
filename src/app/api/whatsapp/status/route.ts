@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { checkWhatsAppConnection, getWhatsAppQRCode } from '@/lib/whatsapp/evolution-api'
+import { checkWhatsAppConnection, getWhatsAppQRCode } from '@/lib/whatsapp'
 import { requireRoles } from '@/lib/auth-utils'
 
 // GET /api/whatsapp/status - Verificar status da conexão WhatsApp
