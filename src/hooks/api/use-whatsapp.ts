@@ -1,24 +1,38 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import type { MessageStatus, OrderStatus } from '@prisma/client'
+import type { WhatsAppConfigFormData, WhatsAppConfigUpdateData } from '@/lib/validations/whatsapp'
 
 // ==================== TIPOS ====================
 
-interface WhatsAppConfig {
+export type WhatsAppProviderName = 'EVOLUTION' | 'META'
+export type MetaTemplateStatusName = 'NOT_CREATED' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAUSED'
+
+export interface WhatsAppConfig {
   id: string
-  instanceName: string
-  apiKey: string
+  provider: WhatsAppProviderName
+  // Evolution
+  instanceName: string | null
   apiUrl: string
+  hasApiKey: boolean
+  // Meta (segredos nunca vêm da API)
+  metaPhoneNumberId: string | null
+  metaWabaId: string | null
+  metaAppId: string | null
+  hasMetaAccessToken: boolean
+  metaAccessTokenHint: string | null
+  // Estado
   isConnected: boolean
   phoneNumber: string | null
   companyId: string
   templates: MessageTemplate[]
+  mock?: boolean
   _count?: {
     messageLogs: number
   }
 }
 
-interface MessageTemplate {
+export interface MessageTemplate {
   id: string
   name: string
   description: string | null
@@ -27,6 +41,10 @@ interface MessageTemplate {
   isActive: boolean
   isDefault: boolean
   whatsappConfigId: string
+  metaTemplateName: string | null
+  metaLanguage: string
+  metaStatus: MetaTemplateStatusName
+  metaRejectReason: string | null
 }
 
 interface MessageLog {
@@ -36,6 +54,7 @@ interface MessageLog {
   status: MessageStatus
   errorMessage: string | null
   orderNumber: string | null
+  providerMessageId: string | null
   sentAt: string | null
   deliveredAt: string | null
   createdAt: string
@@ -67,10 +86,18 @@ interface QRCodeResponse {
   message: string
 }
 
-interface ConnectionStatusResponse {
+export interface ConnectionStatusResponse {
   connected: boolean
   state: string
   phoneNumber?: string
+  error?: string
+}
+
+export interface MetaTemplateSyncResult {
+  name: string
+  status: string
+  rejectedReason?: string
+  error?: string
 }
 
 // ==================== CONFIG HOOKS ====================
@@ -92,13 +119,8 @@ export function useWhatsAppConfig(companyId?: string) {
 export function useCreateWhatsAppConfig() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: async (data: {
-      instanceName: string
-      apiKey: string
-      apiUrl: string
-      companyId: string
-    }) => {
+  return useMutation<WhatsAppConfig, Error, WhatsAppConfigFormData>({
+    mutationFn: async (data) => {
       const response = await axios.post('/api/whatsapp/config', data)
       return response.data
     },
@@ -113,13 +135,8 @@ export function useCreateWhatsAppConfig() {
 export function useUpdateWhatsAppConfig() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: async (data: {
-      id: string
-      instanceName?: string
-      apiKey?: string
-      apiUrl?: string
-    }) => {
+  return useMutation<WhatsAppConfig, Error, WhatsAppConfigUpdateData & { id: string }>({
+    mutationFn: async (data) => {
       const response = await axios.put('/api/whatsapp/config', data)
       return response.data
     },
@@ -168,9 +185,11 @@ export function useCreateMessageTemplate() {
       name: string
       description?: string
       triggerStatus: OrderStatus
-      content: string
+      content?: string
       isActive?: boolean
       whatsappConfigId: string
+      metaTemplateName?: string
+      metaLanguage?: string
     }) => {
       const response = await axios.post('/api/whatsapp/templates', data)
       return response.data
@@ -194,6 +213,8 @@ export function useUpdateMessageTemplate() {
       triggerStatus?: OrderStatus
       content?: string
       isActive?: boolean
+      metaTemplateName?: string
+      metaLanguage?: string
     }) => {
       const response = await axios.put('/api/whatsapp/templates', data)
       return response.data
@@ -217,6 +238,38 @@ export function useDeleteMessageTemplate() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-templates'] })
       queryClient.invalidateQueries({ queryKey: ['whatsapp-config'] })
+    },
+  })
+}
+
+// Hook para criar na Meta os templates ainda não criados
+export function useSyncMetaTemplates() {
+  const queryClient = useQueryClient()
+
+  return useMutation<{ results: MetaTemplateSyncResult[]; templates: MessageTemplate[] }, Error, { companyId: string }>({
+    mutationFn: async ({ companyId }) => {
+      const { data } = await axios.post('/api/whatsapp/templates/sync', { companyId })
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-config'] })
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-templates'] })
+    },
+  })
+}
+
+// Hook para atualizar o status de aprovação dos templates a partir da Meta
+export function useRefreshMetaTemplateStatus() {
+  const queryClient = useQueryClient()
+
+  return useMutation<{ templates: MessageTemplate[] }, Error, { companyId: string }>({
+    mutationFn: async ({ companyId }) => {
+      const { data } = await axios.get(`/api/whatsapp/templates/sync?companyId=${companyId}`)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-config'] })
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-templates'] })
     },
   })
 }
@@ -247,7 +300,7 @@ export function useMessageLogs(params?: {
 
 // ==================== QR CODE / CONNECTION HOOKS ====================
 
-// Hook para obter QR Code
+// Hook para obter QR Code (só Evolution)
 export function useWhatsAppQRCode(companyId?: string) {
   return useQuery<QRCodeResponse>({
     queryKey: ['whatsapp-qrcode', companyId],
@@ -261,7 +314,7 @@ export function useWhatsAppQRCode(companyId?: string) {
   })
 }
 
-// Hook para verificar status da conexão
+// Hook para verificar status da conexão (qualquer provedor)
 export function useCheckWhatsAppConnection() {
   const queryClient = useQueryClient()
 
@@ -277,7 +330,7 @@ export function useCheckWhatsAppConnection() {
   })
 }
 
-// Hook para desconectar WhatsApp
+// Hook para desconectar WhatsApp (só Evolution)
 export function useDisconnectWhatsApp() {
   const queryClient = useQueryClient()
 
@@ -294,12 +347,14 @@ export function useDisconnectWhatsApp() {
   })
 }
 
-// ==================== LEGACY HOOKS (mantidos para compatibilidade) ====================
+// ==================== STATUS GLOBAL / TESTE ====================
 
-interface WhatsAppStatus {
+export interface WhatsAppStatus {
   connected: boolean
   qrCode: string | null
   message: string
+  mock?: boolean
+  error?: string
 }
 
 interface TestMessageResponse {
@@ -308,7 +363,7 @@ interface TestMessageResponse {
   error?: string
 }
 
-// Hook para verificar o status da conexão WhatsApp (legacy)
+// Hook para verificar o status do provedor global (.env)
 export function useWhatsAppStatus() {
   return useQuery<WhatsAppStatus>({
     queryKey: ['whatsapp-status'],
@@ -321,12 +376,17 @@ export function useWhatsAppStatus() {
   })
 }
 
-// Hook para enviar mensagem de teste (legacy)
+// Hook para enviar mensagem de teste (template FINISHED) pela config da empresa
 export function useTestWhatsAppMessage() {
-  return useMutation<TestMessageResponse, Error, { phone: string }>({
-    mutationFn: async ({ phone }) => {
-      const { data } = await axios.post('/api/whatsapp/test', { phone })
+  const queryClient = useQueryClient()
+
+  return useMutation<TestMessageResponse, Error, { phone: string; companyId?: string }>({
+    mutationFn: async ({ phone, companyId }) => {
+      const { data } = await axios.post('/api/whatsapp/test', { phone, companyId })
       return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-logs'] })
     },
   })
 }
