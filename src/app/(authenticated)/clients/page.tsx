@@ -73,7 +73,8 @@ export default function ClientsPage() {
       setDeleteConfirm(null)
     } catch (error) {
       console.error('Erro ao excluir cliente:', error)
-      alert('Erro ao excluir cliente')
+      const axiosError = error as { response?: { data?: { error?: string } } }
+      alert(axiosError?.response?.data?.error || 'Erro ao excluir cliente')
     }
   }
 
