@@ -38,7 +38,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
     const { user, error } = await requireRoles(['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'])
     if (error) return error
     const { id } = await params
-    const body = await request.json()
+    const body = await request.json().catch(() => null)
 
     const existing = await loadPackage(id)
     if (!existing) return NextResponse.json({ error: 'Pacote não encontrado' }, { status: 404 })
@@ -46,14 +46,15 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
     const denied = denyIfNoStoreAccess(user!, existing.store, 'editar pacotes de')
     if (denied) return denied
 
-    if ((body.storeId && body.storeId !== existing.storeId) || (body.serviceId && body.serviceId !== existing.serviceId)) {
+    const raw: Record<string, unknown> = body && typeof body === 'object' && !Array.isArray(body) ? body : {}
+    if ((raw.storeId && raw.storeId !== existing.storeId) || (raw.serviceId && raw.serviceId !== existing.serviceId)) {
       return NextResponse.json({ error: 'Loja e serviço do pacote não podem ser alterados' }, { status: 400 })
     }
 
     const data = servicePackageUpdateSchema.parse(body)
     const updated = await prisma.servicePackage.update({
       where: { id },
-      data: { ...data, description: data.description ?? undefined },
+      data: { ...data, description: data.description === undefined ? undefined : data.description.trim() || null },
       include: packageInclude,
     })
 

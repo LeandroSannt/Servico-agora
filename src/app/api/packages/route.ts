@@ -18,11 +18,13 @@ export async function GET(request: NextRequest) {
     const sellable = searchParams.get('sellable') === 'true'
 
     // Mesma regra de denyIfNoStoreAccess — SUPER_ADMIN vê tudo,
-    // COMPANY_ADMIN a própria empresa, MANAGER e EMPLOYEE só a própria loja.
+    // COMPANY_ADMIN a própria empresa, demais perfis (default-deny) só a própria loja.
     const where: Record<string, unknown> = {}
-    if (user!.role === 'COMPANY_ADMIN') {
+    if (user!.role === 'SUPER_ADMIN') {
+      // sem restrição
+    } else if (user!.role === 'COMPANY_ADMIN') {
       where.store = { companyId: user!.companyId ?? '__none__' }
-    } else if (user!.role === 'MANAGER' || user!.role === 'EMPLOYEE') {
+    } else {
       where.storeId = user!.storeId ?? '__none__'
     }
 
@@ -83,7 +85,7 @@ export async function POST(request: NextRequest) {
         storeId: data.storeId,
         serviceId: data.serviceId,
         name: data.name,
-        description: data.description || null,
+        description: data.description?.trim() || null,
         quantity: data.quantity,
         price: data.price,
         isActive: data.isActive ?? true,

@@ -16,5 +16,5 @@ export function withDerived<T extends PackageRow>(pkg: T) {
   const unitPrice = Math.round((price / pkg.quantity) * 100) / 100
   const servicePrice = Number(pkg.service.price)
   const savingsPercent = servicePrice > 0 ? Math.round((1 - unitPrice / servicePrice) * 100) : 0
-  return { ...pkg, price, unitPrice, savingsPercent }
+  return { ...pkg, price, unitPrice, savingsPercent, service: { ...pkg.service, price: servicePrice } }
 }
