@@ -55,7 +55,7 @@ A logo da empresa hoje é só uma URL externa (`Company.logoUrl`). O administrad
 
 ### Respostas de empresa
 
-`GET /api/companies`, `GET/PUT/POST /api/companies/[id]` **nunca** devolvem `logoData` (usar `omit: { logoData: true }`) e devolvem `logoUrl` calculado por `companyLogoUrl`. O mesmo vale para `GET /api/orders/[id]` (inclui `store.company.logoUrl`).
+Nenhuma resposta devolve `logoData`: o Prisma Client é criado com omissão global (`omit: { company: { logoData: true } }` em `src/lib/prisma.ts`), então nenhuma consulta carrega a imagem, só a rota da imagem com `select` explícito. As rotas de empresa e `GET /api/orders/[id]` devolvem `logoUrl` calculado por `companyLogoUrl`.
 
 ### Autorização
 
@@ -85,4 +85,4 @@ A logo da empresa hoje é só uma URL externa (`Company.logoUrl`). O administrad
 
 Vitest em `src/lib/__tests__/company-logo.test.ts`: aceita PNG/JPEG/WebP mínimos válidos; rejeita SVG, GIF, tipo declarado diferente dos bytes, base64 corrompido, acima do limite; `companyLogoUrl` com logo enviada, só URL legada e nenhuma.
 
-Navegador: enviar PNG grande → prévia reduzida → salvar → logo aparece na lista e (após novo login) na barra lateral; remover → some; arquivo `.svg`/`.gif` → mensagem; tamanho do registro no banco < 300 KB.
+Navegador: enviar PNG grande → prévia reduzida → salvar → logo aparece no card da lista de empresas e (após novo login) na barra lateral; remover → some; arquivo `.svg`/`.gif` → mensagem; tamanho do registro no banco < 300 KB.
