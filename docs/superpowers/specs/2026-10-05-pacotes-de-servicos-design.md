@@ -47,7 +47,7 @@ Nomes de tabela seguem o padrão snake_case com `@@map`, campos com `@map`.
 | price | Decimal(10,2) | > 0 |
 | isActive | Boolean, default true | |
 | storeId | FK Store, cascade | |
-| serviceId | FK Service, `onDelete: Restrict` | Serviço da mesma loja |
+| serviceId | FK Service, `onDelete: NoAction` | Serviço da mesma loja. `NoAction` (não `Restrict`) para a exclusão em cascata de loja/empresa continuar funcionando; a proteção contra apagar o serviço diretamente é a mesma |
 | createdAt / updatedAt | | |
 
 Relações inversas: `Store.servicePackages`, `Service.packages`.
@@ -58,8 +58,8 @@ Relações inversas: `Store.servicePackages`, `Service.packages`.
 |---|---|---|
 | id | String cuid | |
 | clientId | FK Client, cascade | |
-| packageId | FK ServicePackage, `onDelete: Restrict` | Origem |
-| serviceId | FK Service, `onDelete: Restrict` | Copiado da origem; usado para casar com itens da OS |
+| packageId | FK ServicePackage, `onDelete: NoAction` | Origem |
+| serviceId | FK Service, `onDelete: NoAction` | Copiado da origem; usado para casar com itens da OS |
 | name | String | Copiado |
 | quantity | Int | Copiado |
 | price | Decimal(10,2) | Copiado; valor pago |
@@ -99,9 +99,9 @@ Só tabelas e enum novos; nenhuma coluna existente muda. Em produção o entrypo
 
 Permissões seguem o padrão de `/api/services`: SUPER_ADMIN vê tudo; COMPANY_ADMIN só lojas da sua empresa; MANAGER e EMPLOYEE só a própria loja. Escrita em pacotes (criar, editar, desativar) exige SUPER_ADMIN, COMPANY_ADMIN ou MANAGER. Vender e cancelar venda: os mesmos perfis. Usar saldo na OS: qualquer perfil que já pode criar OS.
 
-### `GET /api/packages?storeId=&isActive=`
+### `GET /api/packages?storeId=&isActive=&sellable=`
 
-Lista pacotes com `service { id, name, price }` e `_count.sales`. Resposta inclui `unitPrice = price / quantity` e `savingsPercent = 1 − unitPrice / service.price` calculados no servidor (arredondados a 2 casas e inteiro, respectivamente).
+Lista pacotes com `service { id, name, price, isActive }` e `_count.sales`. `sellable=true` devolve só pacotes ativos cujo serviço também está ativo (usado pelo modal de venda); sem o parâmetro, a página de pacotes vê todos, inclusive os de serviço inativo. Resposta inclui `unitPrice = price / quantity` e `savingsPercent = 1 − unitPrice / service.price` calculados no servidor (arredondados a 2 casas e inteiro, respectivamente).
 
 ### `POST /api/packages`
 
@@ -131,7 +131,7 @@ Resposta:
 
 ### `POST /api/clients/[id]/packages`
 
-Body `sellPackageSchema`: `packageId`, `notes?`. Regras: cliente existe e o usuário tem acesso à loja dele; pacote existe, ativo, e `package.storeId === client.storeId` (senão 400 "Pacote não pertence à loja do cliente"). Cria `ClientPackage` copiando os dados, `soldById = user.id`. Responde 201 com o pacote no formato acima.
+Body `sellPackageSchema`: `packageId`, `notes?`. Regras: cliente existe e o usuário tem acesso à loja dele; pacote existe, ativo (400 "Pacote inativo"), serviço do pacote ativo (400 "Serviço do pacote está inativo"), e `package.storeId === client.storeId` (senão 400 "Pacote não pertence à loja do cliente"). Cria `ClientPackage` copiando os dados, `soldById = user.id`. Responde 201 com o pacote no formato acima.
 
 ### `DELETE /api/clients/[id]/packages/[clientPackageId]`
 
@@ -141,17 +141,16 @@ Cancela. Regras: pertence ao cliente; `status === 'ACTIVE'`; `usages.length === 
 
 `orderServiceSchema` ganha `usePackageQuantity: z.coerce.number().int().min(0).optional()` — quantas unidades deste item devem sair do saldo. O cliente nunca envia preço 0 por conta própria; se enviar `usePackageQuantity > 0`, o servidor:
 
-1. Dentro da transação já existente (PUT já usa `prisma.$transaction`; POST passa a usar), para cada item com `usePackageQuantity > 0`:
-   - Exige `serviceId` (senão 400 "Só serviços cadastrados podem usar pacote").
-   - Lê os `ClientPackage` ACTIVE do cliente para aquele `serviceId`, ordenados por `soldAt asc`, com `SELECT ... FOR UPDATE` (via `$queryRaw` ou `$executeRaw` de lock, pois Prisma não expõe `FOR UPDATE`), e calcula o saldo. No PUT, consumos da própria OS não contam como usados (eles serão apagados e recriados).
-   - Se `usePackageQuantity > saldo` → 409 `{ error: 'Saldo do pacote insuficiente', serviceId, remaining }`. A transação é abortada.
-   - Se `usePackageQuantity > quantity` → 400.
+0. Antes da transação, validações baratas: item com `usePackageQuantity > 0` exige `serviceId` (400 "Só serviços cadastrados podem usar pacote") e `usePackageQuantity ≤ quantity` (400 "Quantidade do pacote maior que a do item").
+1. Dentro da transação (PUT já usa `prisma.$transaction`; POST passa a usar). **No PUT, o `deleteMany` dos `orderService` antigos roda primeiro**, o que apaga os `PackageUsage` da própria OS por cascata; assim a leitura de saldo a seguir já não conta o consumo da OS em edição, sem regra especial no servidor. Para cada item com `usePackageQuantity > 0`:
+   - Trava os `ClientPackage` ACTIVE do cliente para aquele `serviceId` com `$queryRaw` (`SELECT id FROM client_packages WHERE ... FOR UPDATE`; Prisma não expõe `FOR UPDATE`), depois lê pacotes e consumos e calcula o saldo, ordenando por `soldAt asc`.
+   - Se `usePackageQuantity > saldo` lança `InsufficientBalanceError { serviceId, remaining }` (classe em `src/lib/packages/errors.ts`). A rota captura fora da transação e responde 409 `{ error: 'Saldo do pacote insuficiente', serviceId, remaining }`. Sem isso o erro cairia no `catch` genérico como 500.
    - Grava o item coberto: `quantity = usePackageQuantity`, `price = 0`, `serviceName` e `description` normais, `saveGlobally = false`. Distribui o consumo pelos pacotes mais antigos primeiro (FIFO), criando um `PackageUsage` por pacote tocado. Como `orderServiceId` é único, se o consumo precisar tocar dois pacotes, grava um item coberto por pacote (ex.: 2 do pacote A e 1 do pacote B viram dois itens a R$ 0).
    - Se `quantity − usePackageQuantity > 0`, grava o item cobrado com o restante ao `price` enviado.
 2. `totalAmount` soma só os itens cobrados (os cobertos têm preço 0, então a soma atual já está correta).
-3. No PUT, o `deleteMany` de `orderService` existente apaga os `PackageUsage` por cascata antes de recriar.
+3. Resposta de criação/edição inclui os itens com `packageUsage`.
 
-GET da OS passa a incluir `services.packageUsage { clientPackage { name } }` para o front mostrar "(pacote)".
+`GET /api/orders` (lista) e `GET /api/orders/[id]` passam a incluir `services.packageUsage { quantity, clientPackage { id, name } }`. A lista é o que alimenta a tela de OS e o formulário de edição, então o include é obrigatório nas duas rotas. `OrderService.serviceId` já vem no payload (`services: true`).
 
 ### `GET /api/dashboard/stats`
 
@@ -175,21 +174,24 @@ Hooks em `src/hooks/api/usePackages.ts` seguindo o padrão dos existentes (React
 
 ### Clientes
 
-- Coluna nova na lista: "Saldo", mostrando até dois serviços ("7 Limpeza, 2 Lavagem") e "+N" se houver mais; vazio se não há saldo. Dados vêm de um campo `balances` incluído na resposta de `GET /api/clients` (agregado no servidor; evita N requisições).
+- Coluna nova na lista: "Saldo", mostrando até dois serviços ("7 Limpeza, 2 Lavagem") e "+N" se houver mais; vazio se não há saldo. Dados vêm de um campo `balances: Array<{ serviceId, serviceName, remaining }>` em cada cliente de `GET /api/clients`, com o mesmo formato e regra do endpoint de pacotes do cliente (só ACTIVE, só `remaining > 0`), agregado no servidor com uma consulta por página (evita N requisições).
 - Ações por cliente: "Vender pacote" (ícone `Package`) e "Pacotes" (ícone `History`), visíveis para quem pode vender.
 - Modal **Vender pacote**: select de pacotes ativos da loja do cliente mostrando "10× Limpeza — R$ 250,00"; abaixo, resumo "10 unidades de Limpeza por R$ 250,00 (R$ 25,00/un)"; campo Observação; botão "Registrar venda". Sucesso fecha o modal, invalida clientes e mostra toast "Pacote vendido". Se a loja não tem pacotes ativos: estado vazio com link para `/packages`.
 - Modal **Pacotes do cliente**: lista de `packages` com nome, barra "7 de 10 restantes", preço, data, vendedor, observação, status. Expandir mostra os consumos (data, quantidade, nº da OS com link para `/orders?search=...`). Botão "Cancelar venda" só quando `used === 0 && status === 'ACTIVE'`, com confirmação. Cancelado aparece riscado com badge "Cancelado".
 
 ### OrderForm (Nova OS e edição)
 
-- Ao ter `clientId`, carrega `GET /api/clients/[id]/packages` e guarda `balances` por `serviceId`. Na edição, soma ao saldo as unidades consumidas pela própria OS (`usages` cujo `order.id` é a OS em edição), espelhando a regra do servidor.
+**Pré-requisito na edição.** Hoje o formulário mapeia os itens de uma OS existente com `serviceId: ''` e o tipo da prop `order.services` nem tem `serviceId`. Isso precisa mudar: o tipo ganha `serviceId: string | null` e `packageUsage?: { quantity, clientPackage: { id, name } } | null`, e o mapeamento preserva `serviceId: s.serviceId ?? ''`. Sem isso, editar uma OS que usou pacote falharia com 400 ou, pior, salvaria cobrando tudo e perderia o consumo (o PUT apaga e recria os itens).
+
+- Ao ter `clientId`, carrega `GET /api/clients/[id]/packages` e guarda `balances` por `serviceId`. Na edição, soma ao saldo as unidades consumidas pela própria OS (`usages` cujo `order.id` é a OS em edição), espelhando o efeito do `deleteMany` no servidor.
 - Cada item ganha o campo `usePackageQuantity` (default 0). Ao escolher um serviço com saldo > 0, define `usePackageQuantity = min(quantity, saldoDisponível)` e mostra sob o item:
   - checkbox marcado **"Usar pacote"** + texto "Cliente tem 7 no pacote";
   - se `quantity > saldo`: "2 pelo pacote · 1 cobrado a R$ 30,00".
 - `saldoDisponível` de um serviço desconta o que outros itens do mesmo formulário já estão usando, para o total do formulário nunca prometer mais que o saldo.
 - Desmarcar zera `usePackageQuantity`. Mudar `quantity` recalcula respeitando o teto.
 - Subtotal do item = `price × (quantity − usePackageQuantity)`; `calculateTotal` acompanha. O front não altera `price`.
-- Itens vindos do servidor com `packageUsage` aparecem agrupados de volta num único item de formulário: quantidade total e `usePackageQuantity` = soma dos cobertos, para o operador ver "3 limpezas, 2 pelo pacote" e não dois itens separados. Ao salvar, o servidor divide de novo.
+- Itens vindos do servidor com `packageUsage` aparecem agrupados de volta num único item de formulário: itens consecutivos com o mesmo `serviceId` em que pelo menos um tem `packageUsage` viram um item com `quantity` total e `usePackageQuantity` = soma dos cobertos, para o operador ver "3 limpezas, 2 pelo pacote" e não dois itens separados. Ao salvar, o servidor divide de novo.
+- **Preço unitário do item reagrupado**: vem do item cobrado irmão, se houver; senão (OS totalmente coberta, ex.: 2 de 2), vem do `price` atual do serviço no catálogo (`useServices` da loja já está carregado no formulário); se o serviço não estiver na lista (inativo), fica 0 e o campo de preço continua editável como hoje. Isso garante que, se o operador aumentar a quantidade ou desmarcar "Usar pacote", as unidades descobertas sejam cobradas.
 - Erro 409 do servidor: toast "Saldo do pacote mudou: restam {remaining}. Ajuste o item." e recarrega `balances`.
 
 ### Lista e detalhe de OS, PDF e WhatsApp
@@ -201,7 +203,7 @@ Itens com `packageUsage` exibem o nome com sufixo " (pacote)" e preço R$ 0,00. 
 - Pacote: serviço ativo da mesma loja; quantidade ≥ 2; preço > 0. Loja e serviço imutáveis após criar.
 - Desativar pacote impede novas vendas; saldos vendidos continuam válidos.
 - Excluir pacote só sem vendas; com vendas, desativa.
-- Desativar serviço (DELETE atual) continua permitido; pacotes dele continuam vendáveis? **Não**: `GET /api/packages` filtra `service.isActive` para a venda, e a página de pacotes mostra badge "Serviço inativo". Saldos já vendidos continuam utilizáveis em OS (o serviço inativo já pode ser referenciado por `serviceId` em OS existentes).
+- Desativar serviço (DELETE atual) continua permitido. Pacotes dele deixam de ser vendáveis (`sellable=true` os exclui e o POST de venda recusa) e a página de pacotes mostra badge "Serviço inativo". Saldos já vendidos continuam utilizáveis em OS.
 - Venda: cliente e pacote da mesma loja; valor = preço do pacote no momento; registrada como paga em `soldAt`.
 - Cancelar venda: só ACTIVE e sem consumo.
 - Consumo: FIFO por `soldAt`; nunca excede o saldo; validado com lock na transação; consumos da própria OS em edição contam como disponíveis.
@@ -214,6 +216,7 @@ Itens com `packageUsage` exibem o nome com sufixo " (pacote)" e preço R$ 0,00. 
 | Serviço de outra loja ou inativo ao criar pacote | 400 "Serviço inválido para esta loja" |
 | Pacote de outra loja na venda | 400 "Pacote não pertence à loja do cliente" |
 | Pacote inativo na venda | 400 "Pacote inativo" |
+| Serviço do pacote inativo na venda | 400 "Serviço do pacote está inativo" |
 | Cancelar venda com consumo | 400 "Pacote já utilizado; não pode ser cancelado" |
 | Saldo insuficiente ao salvar OS | 409 `{ error, serviceId, remaining }` |
 | `usePackageQuantity` sem `serviceId` | 400 "Só serviços cadastrados podem usar pacote" |
@@ -236,7 +239,7 @@ A transação da OS, as rotas e as telas são verificadas manualmente no navegad
 
 - `prisma/schema.prisma` (3 modelos, 1 enum, relações inversas)
 - `src/lib/validations/package.ts`, ajuste em `order.ts`
-- `src/lib/packages/{balance,split,allocate}.ts` + testes em `src/lib/packages/__tests__/`
+- `src/lib/packages/{balance,split,allocate,errors}.ts` + testes em `src/lib/packages/__tests__/`
 - `src/app/api/packages/route.ts`, `src/app/api/packages/[id]/route.ts`
 - `src/app/api/clients/[id]/packages/route.ts`, `.../[clientPackageId]/route.ts`
 - `src/app/api/clients/route.ts` (campo `balances`), `src/app/api/orders/route.ts`, `src/app/api/orders/[id]/route.ts`, `src/app/api/dashboard/stats/route.ts`
