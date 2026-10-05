@@ -13,7 +13,7 @@ import { checkWhatsAppConnection, metaTemplateName } from '@/lib/whatsapp'
 import { isMetaMock } from '@/lib/whatsapp/resolve-provider'
 
 // Nunca devolve segredos ao cliente
-export function sanitizeConfig<T extends WhatsAppConfig>(config: T) {
+function sanitizeConfig<T extends WhatsAppConfig>(config: T) {
   const { metaAccessToken, apiKey, ...rest } = config
   return {
     ...rest,
