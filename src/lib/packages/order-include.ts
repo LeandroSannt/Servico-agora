@@ -9,6 +9,8 @@ export const orderServicesInclude = {
         clientPackage: { select: { id: true, name: true } },
       },
     },
+    // Preço atual do catálogo: o OrderForm usa para itens 100% cobertos (gravados a R$ 0)
+    service: { select: { price: true } },
   },
   orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
 } satisfies Prisma.ServiceOrder$servicesArgs

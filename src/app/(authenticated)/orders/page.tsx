@@ -15,6 +15,7 @@ interface OrderService {
   price: number
   quantity: number
   packageUsage?: { quantity: number; clientPackage: { id: string; name: string } } | null
+  service?: { price: number | string } | null
 }
 
 interface Order {

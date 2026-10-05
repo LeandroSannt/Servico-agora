@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { regroupOrderItems, type IncomingOrderItem } from '@/lib/packages/regroup'
+import { regroupOrderItems, catalogPriceFromItems, type IncomingOrderItem } from '@/lib/packages/regroup'
 
 const noCatalog = () => undefined
 
@@ -110,7 +110,7 @@ describe('regroupOrderItems', () => {
     expect(result.map((r) => r.quantity)).toEqual([1, 2])
   })
 
-  it('cobrado de A seguido de coberto de A: funde no item cobrado (a próxima linha é coberta), mantendo o preço cobrado', () => {
+  it('cobrado de A seguido de coberto de A: ficam separados (linha cobrada nunca absorve cobertas seguintes)', () => {
     const result = regroupOrderItems(
       [
         item({ price: 30, quantity: 1 }),
@@ -118,7 +118,70 @@ describe('regroupOrderItems', () => {
       ],
       () => 99
     )
+    expect(result).toHaveLength(2)
+    expect(result[0]).toMatchObject({ serviceId: 'svc-a', quantity: 1, usePackageQuantity: 0, price: 30 })
+    expect(result[1]).toMatchObject({ serviceId: 'svc-a', quantity: 2, usePackageQuantity: 2, price: 99 })
+  })
+
+  it('grupo absorve no máximo UMA linha cobrada: [coberto 1, cobrado 1 a 30, cobrado 1 a 50] vira duas linhas', () => {
+    const result = regroupOrderItems(
+      [
+        item({ price: 0, quantity: 1, packageUsage: { quantity: 1 } }),
+        item({ price: 30, quantity: 1 }),
+        item({ price: 50, quantity: 1 }),
+      ],
+      noCatalog
+    )
+    expect(result).toHaveLength(2)
+    expect(result[0]).toMatchObject({ serviceId: 'svc-a', quantity: 2, usePackageQuantity: 1, price: 30 })
+    expect(result[1]).toMatchObject({ serviceId: 'svc-a', quantity: 1, usePackageQuantity: 0, price: 50 })
+  })
+
+  it('coberto em dois pacotes + um cobrado vira um único item', () => {
+    const result = regroupOrderItems(
+      [
+        item({ price: 0, quantity: 2, packageUsage: { quantity: 2 } }),
+        item({ price: 0, quantity: 1, packageUsage: { quantity: 1 } }),
+        item({ price: 40, quantity: 2 }),
+      ],
+      noCatalog
+    )
     expect(result).toHaveLength(1)
-    expect(result[0]).toMatchObject({ quantity: 3, usePackageQuantity: 2, price: 30 })
+    expect(result[0]).toMatchObject({ quantity: 5, usePackageQuantity: 3, price: 40 })
+  })
+
+  it('a descrição do grupo vem da linha cobrada quando a coberta não tem', () => {
+    const result = regroupOrderItems(
+      [
+        item({ price: 0, quantity: 1, description: null, packageUsage: { quantity: 1 } }),
+        item({ price: 30, quantity: 1, description: 'Completa' }),
+      ],
+      noCatalog
+    )
+    expect(result[0]).toMatchObject({ description: 'Completa', quantity: 2 })
+  })
+
+  it('coberto seguido de cobrado de OUTRO serviço não absorve', () => {
+    const result = regroupOrderItems(
+      [
+        item({ serviceId: 'svc-a', price: 0, quantity: 1, packageUsage: { quantity: 1 } }),
+        item({ serviceId: 'svc-b', price: 50, quantity: 1 }),
+      ],
+      noCatalog
+    )
+    expect(result).toHaveLength(2)
+  })
+})
+
+describe('catalogPriceFromItems', () => {
+  it('usa o preço do serviço vinculado (Decimal-string vira número)', () => {
+    const lookup = catalogPriceFromItems([
+      { serviceId: 'svc-a', service: { price: '42.50' } },
+      { serviceId: 'svc-b', service: null },
+      { serviceId: null },
+    ])
+    expect(lookup('svc-a')).toBe(42.5)
+    expect(lookup('svc-b')).toBeUndefined()
+    expect(lookup('svc-x')).toBeUndefined()
   })
 })

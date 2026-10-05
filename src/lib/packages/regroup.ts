@@ -18,38 +18,73 @@ export interface FormOrderItem {
   usePackageQuantity: number
 }
 
+function plainItem(s: IncomingOrderItem): FormOrderItem {
+  return {
+    serviceId: s.serviceId ?? '',
+    serviceName: s.serviceName,
+    description: s.description || '',
+    price: Number(s.price),
+    quantity: s.quantity,
+    saveGlobally: false,
+    isExisting: true,
+    usePackageQuantity: 0,
+  }
+}
+
 /**
- * Itens consecutivos do mesmo serviço em que algum veio de pacote viram um só item do formulário
- * (quantidade total; usePackageQuantity = unidades cobertas). Preço do item reagrupado: o do item
- * cobrado irmão; senão o preço atual do catálogo; senão 0 (o campo continua editável).
+ * Reconstrói as linhas do formulário a partir dos itens gravados. O servidor grava cada linha do
+ * formulário como [linhas cobertas…, no máximo uma linha cobrada], em ordem. Então um grupo começa
+ * numa linha coberta (packageUsage), absorve as cobertas seguintes do mesmo serviço e depois NO
+ * MÁXIMO uma linha cobrada do mesmo serviço (preço e, se faltar, descrição vêm dela), e fecha.
+ * Linha cobrada nunca absorve cobertas seguintes; linhas cobradas avulsas ficam separadas.
+ * Sem linha cobrada, o preço vem do catálogo (catalogPrice) ou 0 (o campo continua editável).
  */
 export function regroupOrderItems(
   items: IncomingOrderItem[],
   catalogPrice: (serviceId: string) => number | undefined
 ): FormOrderItem[] {
   const out: FormOrderItem[] = []
-  for (const s of items) {
-    const prev = out[out.length - 1]
-    const samePackageGroup =
-      !!prev && !!s.serviceId && prev.serviceId === s.serviceId && (!!s.packageUsage || prev.usePackageQuantity > 0)
-
-    if (samePackageGroup) {
-      prev.quantity += s.quantity
-      if (s.packageUsage) prev.usePackageQuantity += s.quantity
-      else prev.price = Number(s.price)
+  let i = 0
+  while (i < items.length) {
+    const s = items[i]
+    i++
+    if (!s.packageUsage) {
+      out.push(plainItem(s))
       continue
     }
 
-    out.push({
-      serviceId: s.serviceId ?? '',
-      serviceName: s.serviceName,
-      description: s.description || '',
-      price: s.packageUsage ? (catalogPrice(s.serviceId ?? '') ?? 0) : Number(s.price),
-      quantity: s.quantity,
-      saveGlobally: false,
-      isExisting: true,
-      usePackageQuantity: s.packageUsage ? s.quantity : 0,
-    })
+    const group: FormOrderItem = {
+      ...plainItem(s),
+      price: s.serviceId ? (catalogPrice(s.serviceId) ?? 0) : 0,
+      usePackageQuantity: s.quantity,
+    }
+    const sameService = (next: IncomingOrderItem | undefined) =>
+      !!next && !!s.serviceId && next.serviceId === s.serviceId
+
+    while (i < items.length && sameService(items[i]) && items[i].packageUsage) {
+      group.quantity += items[i].quantity
+      group.usePackageQuantity += items[i].quantity
+      i++
+    }
+    if (i < items.length && sameService(items[i]) && !items[i].packageUsage) {
+      const charged = items[i]
+      group.quantity += charged.quantity
+      group.price = Number(charged.price)
+      if (!group.description) group.description = charged.description || ''
+      i++
+    }
+    out.push(group)
   }
   return out
+}
+
+/** Preço atual do serviço vinculado a cada item (incluído pela API), para os itens 100% cobertos. */
+export function catalogPriceFromItems(
+  items: { serviceId: string | null; service?: { price: number | string } | null }[]
+): (serviceId: string) => number | undefined {
+  const prices = new Map<string, number>()
+  for (const s of items) {
+    if (s.serviceId && s.service) prices.set(s.serviceId, Number(s.service.price))
+  }
+  return (serviceId) => prices.get(serviceId)
 }
