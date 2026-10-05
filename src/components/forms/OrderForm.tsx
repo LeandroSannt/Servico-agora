@@ -5,9 +5,37 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useSession } from 'next-auth/react'
 import { Button, Input, Textarea, Select, Checkbox, Modal } from '@/components/ui'
 import { serviceOrderSchema, type ServiceOrderFormData, clientSchema, type ClientFormData } from '@/lib/validations'
-import { useCreateOrder, useUpdateOrder, useClients, useServices, useCreateClient, useStores } from '@/hooks/api'
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, X, UserPlus, Store } from 'lucide-react'
+import {
+  useCreateOrder,
+  useUpdateOrder,
+  useClients,
+  useServices,
+  useCreateClient,
+  useStores,
+  useClientPackages,
+} from '@/hooks/api'
+import { regroupOrderItems } from '@/lib/packages/regroup'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Plus, Trash2, X, UserPlus, Store, Package } from 'lucide-react'
+
+/**
+ * Uso efetivo de pacote por item, em ordem: nunca promete mais que o saldo disponível
+ * (itens anteriores do mesmo serviço consomem o saldo primeiro).
+ */
+function computeEffectiveUse(
+  items: { serviceId?: string; quantity?: number; usePackageQuantity?: number }[],
+  balanceByService: Map<string, number>
+): number[] {
+  const left = new Map(balanceByService)
+  return items.map((s) => {
+    const requested = Number(s.usePackageQuantity) || 0
+    if (!s.serviceId || requested <= 0) return 0
+    const avail = left.get(s.serviceId) ?? 0
+    const use = Math.max(0, Math.min(requested, Number(s.quantity) || 1, avail))
+    left.set(s.serviceId, avail - use)
+    return use
+  })
+}
 
 interface OrderFormProps {
   order?: {
@@ -20,10 +48,12 @@ interface OrderFormProps {
     store: { id: string; name: string }
     services: {
       id: string
+      serviceId: string | null
       serviceName: string
       description: string | null
       price: number
       quantity: number
+      packageUsage?: { quantity: number; clientPackage: { id: string; name: string } } | null
     }[]
   } | null
   onSuccess: () => void
@@ -58,6 +88,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     quantity: 1,
     saveGlobally: false,
     isExisting: false,
+    usePackageQuantity: 0,
   }
 
   const {
@@ -66,6 +97,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     control,
     formState: { errors },
     watch,
+    getValues,
     setValue,
     setError,
   } = useForm<ServiceOrderFormData>({
@@ -75,15 +107,8 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       description: order?.description || '',
       storeId: initialStoreId,
       clientId: order?.client?.id || '',
-      services: order?.services?.map((s) => ({
-        serviceId: '',
-        serviceName: s.serviceName,
-        description: s.description || '',
-        price: s.price,
-        quantity: s.quantity,
-        saveGlobally: false,
-        isExisting: true, // Marcar como serviço existente na OS
-      })) || [emptyServiceItem],
+      // Itens vindos de pacote são reagrupados com o irmão cobrado (preço do catálogo entra depois)
+      services: order?.services ? regroupOrderItems(order.services, () => undefined) : [emptyServiceItem],
     },
   })
 
@@ -94,6 +119,50 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
 
   const watchedServices = watch('services')
   const storeId = watch('storeId')
+  const clientId = watch('clientId')
+  const { data: clientPackages, refetch: refetchBalances } = useClientPackages(clientId)
+
+  // Saldo por serviço; na edição, os consumos da própria OS voltam a contar como disponíveis
+  const balanceByService = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const b of clientPackages?.balances ?? []) map.set(b.serviceId, b.remaining)
+    if (order) {
+      for (const p of clientPackages?.packages ?? []) {
+        if (p.status !== 'ACTIVE') continue
+        for (const u of p.usages) {
+          if (u.order.id === order.id) map.set(p.serviceId, (map.get(p.serviceId) ?? 0) + u.quantity)
+        }
+      }
+    }
+    return map
+  }, [clientPackages, order])
+
+  // Uso efetivo por item. Sem useMemo de propósito: watch('services') devolve o mesmo array
+  // (mutado no lugar) após setValue em campos aninhados, então a memo ficaria desatualizada.
+  const effectiveUse = computeEffectiveUse(watchedServices ?? [], balanceByService)
+
+  // Mantém o uso de pacote em sincronia com a quantidade (só se o item já usa pacote)
+  const syncPackageUseWithQuantity = (index: number, rawQuantity: string) => {
+    const newQuantity = Number(rawQuantity)
+    if (!Number.isInteger(newQuantity) || newQuantity < 1) return
+    const current = Number(getValues(`services.${index}.usePackageQuantity`)) || 0
+    if (current <= 0) return
+    const serviceId = getValues(`services.${index}.serviceId`)
+    const balance = serviceId ? balanceByService.get(serviceId) ?? 0 : 0
+    // Sem saldo: preserva a intenção do usuário; effectiveUse limita ao disponível
+    setValue(`services.${index}.usePackageQuantity`, balance > 0 ? Math.min(newQuantity, balance) : newQuantity)
+  }
+
+  const quantityRegisterOptions = (index: number) => ({
+    valueAsNumber: true as const,
+    onChange: (e: { target: { value: string } }) => syncPackageUseWithQuantity(index, e.target.value),
+  })
+
+  // Saldos pertencem ao cliente anterior: desmarca o uso de pacote de todos os itens
+  const resetPackageUse = () => {
+    const items = getValues('services') ?? []
+    items.forEach((_, i) => setValue(`services.${i}.usePackageQuantity`, 0))
+  }
 
   // Lojas disponíveis (só usadas no modo com select; requisição leve, aceita)
   const { data: storesData } = useStores({ limit: 100 })
@@ -105,6 +174,23 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
 
   const { data: servicesData } = useServices({ storeId: storeId, limit: 100 })
   const services = servicesData?.data || []
+
+  // Edição: itens 100% cobertos por pacote chegam sem preço (o servidor grava 0); quando o
+  // catálogo carregar, usa o preço atual dele para a parte que vier a ser cobrada.
+  const catalogPriceApplied = useRef(false)
+  useEffect(() => {
+    if (!order || catalogPriceApplied.current || services.length === 0) return
+    catalogPriceApplied.current = true
+    const items = getValues('services') ?? []
+    items.forEach((item, i) => {
+      if ((Number(item.usePackageQuantity) || 0) <= 0 || Number(item.price) !== 0 || !item.serviceId) return
+      const catalogService = services.find((s) => s.id === item.serviceId)
+      if (catalogService) setValue(`services.${i}.price`, Number(catalogService.price))
+    })
+    // Roda uma única vez, quando o catálogo fica disponível; `services` é um array novo a cada
+    // render (fallback `|| []`), então incluí-lo nas deps re-executaria o efeito sem necessidade.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [services.length > 0])
 
   // New client form
   const {
@@ -136,6 +222,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       const newClient = await createClientMutation.mutateAsync(data)
       // Selecionar o novo cliente automaticamente
       setValue('clientId', newClient.id)
+      resetPackageUse()
       setShowNewClientModal(false)
       resetClientForm()
     } catch (error) {
@@ -148,12 +235,27 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
   useEffect(() => {
     if (createMutation.error || updateMutation.error) {
       const error = createMutation.error || updateMutation.error
-      const axiosError = error as { response?: { data?: { error?: string } } } | null
-      setError('root', {
-        message: axiosError?.response?.data?.error || 'Erro ao salvar ordem de serviço',
-      })
+      const axiosError = error as {
+        response?: { status?: number; data?: { error?: string; remaining?: number } }
+      } | null
+      if (axiosError?.response?.status === 409) {
+        // Saldo de pacote mudou (ou conflito de concorrência): recarrega os saldos
+        refetchBalances()
+        const data = axiosError.response.data
+        const remaining = data?.remaining
+        setError('root', {
+          message:
+            remaining !== undefined
+              ? `Saldo do pacote mudou: restam ${remaining}. Ajuste o item.`
+              : data?.error || 'Conflito ao salvar a OS; tente novamente',
+        })
+      } else {
+        setError('root', {
+          message: axiosError?.response?.data?.error || 'Erro ao salvar ordem de serviço',
+        })
+      }
     }
-  }, [createMutation.error, updateMutation.error, setError])
+  }, [createMutation.error, updateMutation.error, setError, refetchBalances])
 
   const handleServiceSelect = (index: number, serviceId: string) => {
     if (serviceId === 'new') {
@@ -162,20 +264,32 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       setValue(`services.${index}.serviceName`, '')
       setValue(`services.${index}.description`, '')
       setValue(`services.${index}.price`, 0)
+      setValue(`services.${index}.usePackageQuantity`, 0)
     } else if (serviceId) {
       const service = services.find((s) => s.id === serviceId)
       if (service) {
         setValue(`services.${index}.serviceId`, serviceId)
         setValue(`services.${index}.serviceName`, service.name)
         setValue(`services.${index}.description`, service.description || '')
-        setValue(`services.${index}.price`, service.price)
+        setValue(`services.${index}.price`, Number(service.price))
+        // Com saldo, o pacote é usado por padrão
+        const quantity = Number(getValues(`services.${index}.quantity`)) || 1
+        setValue(
+          `services.${index}.usePackageQuantity`,
+          Math.min(quantity, balanceByService.get(serviceId) ?? 0)
+        )
         setShowNewService(null)
       }
     }
   }
 
   const calculateTotal = () => {
-    return watchedServices?.reduce((sum, s) => sum + (s.price || 0) * (s.quantity || 1), 0) || 0
+    return (
+      watchedServices?.reduce((sum, s, i) => {
+        const charged = Math.max(0, (Number(s.quantity) || 1) - (effectiveUse[i] ?? 0))
+        return sum + (Number(s.price) || 0) * charged
+      }, 0) || 0
+    )
   }
 
   const formatCurrency = (value: number) => {
@@ -187,13 +301,15 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
 
   const onSubmit = async (data: ServiceOrderFormData) => {
     try {
-      // Garantir que price e quantity são números
+      // Garantir que price e quantity são números; o uso de pacote enviado nunca passa do saldo
+      const submitUse = computeEffectiveUse(data.services, balanceByService)
       const normalizedData = {
         ...data,
-        services: data.services.map((service) => ({
+        services: data.services.map((service, index) => ({
           ...service,
           price: Number(service.price) || 0,
           quantity: Number(service.quantity) || 1,
+          usePackageQuantity: submitUse[index],
         })),
       }
 
@@ -258,7 +374,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                 placeholder={storeId ? 'Selecione o cliente' : 'Selecione a loja primeiro'}
                 error={errors.clientId?.message}
                 disabled={!storeId || !!order}
-                {...register('clientId')}
+                {...register('clientId', { onChange: resetPackageUse })}
               />
             </div>
             {!order && storeId && (
@@ -313,6 +429,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                 quantity: 1,
                 saveGlobally: false,
                 isExisting: false, // Novo serviço adicionado durante edição
+                usePackageQuantity: 0,
               })
             }
           >
@@ -366,7 +483,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                     label="Quantidade"
                     type="number"
                     min="1"
-                    {...register(`services.${index}.quantity` as const, { valueAsNumber: true })}
+                    {...register(`services.${index}.quantity` as const, quantityRegisterOptions(index))}
                   />
                 </div>
               ) : showNewService === index ? (
@@ -411,7 +528,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                       label="Quantidade"
                       type="number"
                       min="1"
-                      {...register(`services.${index}.quantity` as const, { valueAsNumber: true })}
+                      {...register(`services.${index}.quantity` as const, quantityRegisterOptions(index))}
                     />
                     <div className="flex items-end pb-2">
                       <Checkbox
@@ -421,8 +538,21 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                     </div>
                   </div>
                 </div>
-              ) : (
+              ) : (() => {
                 /* Existing service - show details with edit capability */
+                const item = watchedServices[index]
+                const itemServiceId = item.serviceId || ''
+                const qty = Number(item.quantity) || 1
+                const price = Number(item.price) || 0
+                const requested = Number(item.usePackageQuantity) || 0
+                const use = effectiveUse[index] ?? 0
+                const charged = Math.max(0, qty - use)
+                // Saldo que sobra para esta linha depois das linhas anteriores do mesmo serviço
+                const takenBefore = effectiveUse
+                  .slice(0, index)
+                  .reduce((sum, u, i) => (watchedServices[i]?.serviceId === itemServiceId ? sum + u : sum), 0)
+                const balance = Math.max(0, (balanceByService.get(itemServiceId) ?? 0) - takenBefore)
+                return (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600 font-medium">
@@ -445,22 +575,49 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                     )}
                     <div className="flex justify-between items-center mt-2">
                       <p className="text-green-600 font-semibold">
-                        {formatCurrency(watchedServices[index].price)} x{' '}
-                        {watchedServices[index].quantity} ={' '}
-                        {formatCurrency(
-                          watchedServices[index].price * watchedServices[index].quantity
-                        )}
+                        {formatCurrency(price)} x {charged} = {formatCurrency(price * charged)}
                       </p>
                       <Input
                         type="number"
                         min="1"
                         className="w-20"
-                        {...register(`services.${index}.quantity` as const, { valueAsNumber: true })}
+                        {...register(`services.${index}.quantity` as const, quantityRegisterOptions(index))}
                       />
                     </div>
                   </div>
+                  {itemServiceId && (balance > 0 || requested > 0) && (
+                    <div className="flex flex-col gap-1 p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                          checked={requested > 0}
+                          onChange={(e) =>
+                            setValue(
+                              `services.${index}.usePackageQuantity`,
+                              e.target.checked ? Math.min(qty, balance) || qty : 0
+                            )
+                          }
+                        />
+                        <Package className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium text-blue-800">Usar pacote</span>
+                        <span className="text-blue-700">· cliente tem {balance} no pacote</span>
+                      </label>
+                      {requested > 0 && use === 0 ? (
+                        <p className="text-amber-700 pl-6">Sem saldo disponível; será cobrado normalmente.</p>
+                      ) : (
+                        requested > 0 &&
+                        use < qty && (
+                          <p className="text-blue-700 pl-6">
+                            {use} pelo pacote · {qty - use} cobrado a {formatCurrency(price)}
+                          </p>
+                        )
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+                )
+              })()}
             </div>
           ))}
         </div>

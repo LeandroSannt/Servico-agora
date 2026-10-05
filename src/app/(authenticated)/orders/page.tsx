@@ -9,10 +9,12 @@ import { useOrders, useDeleteOrder, useUpdateOrderStatus } from '@/hooks/api'
 
 interface OrderService {
   id: string
+  serviceId: string | null
   serviceName: string
   description: string | null
   price: number
   quantity: number
+  packageUsage?: { quantity: number; clientPackage: { id: string; name: string } } | null
 }
 
 interface Order {
@@ -608,7 +610,10 @@ export default function OrdersPage() {
                     className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-gray-50 p-3 rounded-lg gap-1 sm:gap-4"
                   >
                     <div className="min-w-0">
-                      <p className="font-medium text-sm sm:text-base text-gray-900 truncate">{service.serviceName}</p>
+                      <p className="font-medium text-sm sm:text-base text-gray-900 truncate">
+                        {service.serviceName}
+                        {service.packageUsage && <span className="ml-1 text-xs text-blue-600">(pacote)</span>}
+                      </p>
                       {service.description && (
                         <p className="text-xs sm:text-sm text-gray-700 truncate">{service.description}</p>
                       )}
