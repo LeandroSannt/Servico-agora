@@ -11,6 +11,7 @@ export interface DashboardStats {
   totalPending: number
   totalPaid: number
   totalRevenue: number
+  packagesRevenue: number
 }
 
 interface UseDashboardStatsParams {
