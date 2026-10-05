@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const orderWhere: Prisma.ServiceOrderWhereInput =
       Object.keys(dateFilter).length > 0 ? { ...scopeWhere, createdAt: dateFilter } : scopeWhere
 
-    const [ordersReceived, ordersInProgress, ordersPaused, ordersFinished, ordersPaid, totalClients, revenueFinished, revenuePaid] = await Promise.all([
+    const [ordersReceived, ordersInProgress, ordersPaused, ordersFinished, ordersPaid, totalClients, revenueFinished, revenuePaid, packagesRevenueAgg] = await Promise.all([
       prisma.serviceOrder.count({ where: { ...orderWhere, status: 'RECEIVED' } }),
       prisma.serviceOrder.count({ where: { ...orderWhere, status: 'IN_PROGRESS' } }),
       prisma.serviceOrder.count({ where: { ...orderWhere, status: 'PAUSED' } }),
@@ -47,7 +47,18 @@ export async function GET(request: NextRequest) {
         where: { ...orderWhere, status: 'PAID' },
         _sum: { totalAmount: true },
       }),
+      // Pacotes vendidos (ativos) no período
+      prisma.clientPackage.aggregate({
+        where: {
+          status: 'ACTIVE',
+          client: clientWhere,
+          ...(Object.keys(dateFilter).length > 0 ? { soldAt: dateFilter } : {}),
+        },
+        _sum: { price: true },
+      }),
     ])
+
+    const packagesRevenue = Number(packagesRevenueAgg._sum.price || 0)
 
     return NextResponse.json({
       ordersReceived,
@@ -60,8 +71,13 @@ export async function GET(request: NextRequest) {
       totalPending: revenueFinished._sum.totalAmount || 0,
       // Total pago = receita confirmada
       totalPaid: revenuePaid._sum.totalAmount || 0,
-      // Total geral (finalizadas + pagas)
-      totalRevenue: Number(revenueFinished._sum.totalAmount || 0) + Number(revenuePaid._sum.totalAmount || 0),
+      // Receita de pacotes vendidos (ativos) no período
+      packagesRevenue,
+      // Total geral (finalizadas + pagas + pacotes)
+      totalRevenue:
+        Number(revenueFinished._sum.totalAmount || 0) +
+        Number(revenuePaid._sum.totalAmount || 0) +
+        packagesRevenue,
     })
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error)

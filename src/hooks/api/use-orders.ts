@@ -8,6 +8,9 @@ interface OrderService {
   description: string | null
   price: number
   quantity: number
+  serviceId: string | null
+  packageUsage?: { quantity: number; clientPackage: { id: string; name: string } } | null
+  service?: { price: number | string } | null
 }
 
 interface Order {
@@ -84,6 +87,8 @@ export function useCreateOrder() {
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       queryClient.invalidateQueries({ queryKey: ['services'] }) // Invalidar serviços caso novos tenham sido salvos
+      queryClient.invalidateQueries({ queryKey: ['client-packages'] })
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
     },
   })
 }
@@ -99,7 +104,10 @@ export function useUpdateOrder() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['order', variables.id] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       queryClient.invalidateQueries({ queryKey: ['services'] }) // Invalidar serviços caso novos tenham sido salvos
+      queryClient.invalidateQueries({ queryKey: ['client-packages'] })
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
     },
   })
 }
@@ -131,6 +139,8 @@ export function useDeleteOrder() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['client-packages'] })
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
     },
   })
 }

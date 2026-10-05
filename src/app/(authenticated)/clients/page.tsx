@@ -1,11 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Search, Users, Edit, Trash2, Phone, Mail, MoreVertical } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { Plus, Search, Users, Edit, Trash2, Phone, Mail, MoreVertical, Package, History } from 'lucide-react'
 import { Button, Input, Badge, EmptyState, Modal } from '@/components/ui'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import ClientForm from '@/components/forms/ClientForm'
+import SellPackageModal from '@/components/packages/SellPackageModal'
+import ClientPackagesModal from '@/components/packages/ClientPackagesModal'
 import { useClients, useDeleteClient } from '@/hooks/api'
 import { formatPhone, formatDocument } from '@/lib/utils'
 
@@ -20,8 +23,10 @@ interface Client {
   state: string | null
   zipCode: string | null
   notes: string | null
+  storeId: string
   store: { id: string; name: string }
   _count?: { serviceOrders: number }
+  balances?: { serviceId: string; serviceName: string; remaining: number }[]
 }
 
 export default function ClientsPage() {
@@ -30,6 +35,21 @@ export default function ClientsPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [openActionsId, setOpenActionsId] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+
+  const { data: session } = useSession()
+  const canSell = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'].includes(session?.user?.role ?? '')
+  const [sellFor, setSellFor] = useState<Client | null>(null)
+  const [historyFor, setHistoryFor] = useState<Client | null>(null)
+
+  const balanceInfo = (client: Client) => {
+    const b = client.balances ?? []
+    if (b.length === 0) return null
+    const shown = b.slice(0, 2).map((x) => `${x.remaining} ${x.serviceName}`).join(', ')
+    return {
+      label: b.length > 2 ? `${shown} +${b.length - 2}` : shown,
+      title: b.map((x) => `${x.remaining} ${x.serviceName}`).join(', '),
+    }
+  }
 
   const { data: clientsData, isLoading: loading } = useClients({ search, limit: 50 })
   const deleteMutation = useDeleteClient()
@@ -53,7 +73,8 @@ export default function ClientsPage() {
       setDeleteConfirm(null)
     } catch (error) {
       console.error('Erro ao excluir cliente:', error)
-      alert('Erro ao excluir cliente')
+      const axiosError = error as { response?: { data?: { error?: string } } }
+      alert(axiosError?.response?.data?.error || 'Erro ao excluir cliente')
     }
   }
 
@@ -63,7 +84,9 @@ export default function ClientsPage() {
   }
 
   // Mobile card view for clients
-  const ClientCard = ({ client }: { client: Client }) => (
+  const ClientCard = ({ client }: { client: Client }) => {
+    const balance = balanceInfo(client)
+    return (
     <div className="bg-white rounded-lg shadow-sm border p-4 space-y-3">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3 min-w-0">
@@ -89,6 +112,28 @@ export default function ClientsPage() {
                 onClick={() => setOpenActionsId(null)}
               />
               <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border py-1 z-20 min-w-[120px]">
+                <button
+                  onClick={() => {
+                    setHistoryFor(client)
+                    setOpenActionsId(null)
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <History className="h-4 w-4" />
+                  Pacotes
+                </button>
+                {canSell && (
+                  <button
+                    onClick={() => {
+                      setSellFor(client)
+                      setOpenActionsId(null)
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <Package className="h-4 w-4" />
+                    Vender pacote
+                  </button>
+                )}
                 <button
                   onClick={() => handleEdit(client)}
                   className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
@@ -129,12 +174,18 @@ export default function ClientsPage() {
         <div className="text-gray-500">
           {client.city && client.state ? `${client.city}/${client.state}` : '-'}
         </div>
-        <Badge variant="primary" className="text-xs">
-          {client._count?.serviceOrders || 0} OS
-        </Badge>
+        <div className="flex items-center gap-2">
+          {balance && (
+            <Badge variant="info" className="text-xs whitespace-nowrap" title={balance.title}>{balance.label}</Badge>
+          )}
+          <Badge variant="primary" className="text-xs">
+            {client._count?.serviceOrders || 0} OS
+          </Badge>
+        </div>
       </div>
     </div>
-  )
+    )
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -206,11 +257,14 @@ export default function ClientsPage() {
                     <TableHead>Documento</TableHead>
                     <TableHead>Localização</TableHead>
                     <TableHead>OS</TableHead>
+                    <TableHead>Saldo</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clients.map((client) => (
+                  {clients.map((client) => {
+                    const balance = balanceInfo(client)
+                    return (
                     <TableRow key={client.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -251,7 +305,22 @@ export default function ClientsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
+                        {balance ? (
+                          <Badge variant="info" className="whitespace-nowrap" title={balance.title}>{balance.label}</Badge>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="icon" title="Pacotes" aria-label={`Pacotes de ${client.name}`} onClick={() => setHistoryFor(client)}>
+                            <History className="w-4 h-4" />
+                          </Button>
+                          {canSell && (
+                            <Button variant="ghost" size="icon" title="Vender pacote" aria-label={`Vender pacote para ${client.name}`} onClick={() => setSellFor(client)}>
+                              <Package className="w-4 h-4 text-blue-600" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -269,7 +338,8 @@ export default function ClientsPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -321,6 +391,9 @@ export default function ClientsPage() {
           </div>
         </div>
       </Modal>
+
+      <SellPackageModal client={sellFor} onClose={() => setSellFor(null)} />
+      <ClientPackagesModal client={historyFor} canCancel={canSell} onClose={() => setHistoryFor(null)} />
     </div>
   )
 }

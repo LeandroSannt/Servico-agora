@@ -66,6 +66,7 @@ model Store {
   clients       Client[]
   services      Service[]
   serviceOrders ServiceOrder[]
+  servicePackages ServicePackage[]
 
   @@map("stores")
 }
@@ -93,6 +94,7 @@ model User {
 
   // OS criadas pelo usuário
   serviceOrdersCreated ServiceOrder[] @relation("OrderCreator")
+  soldPackages ClientPackage[] @relation("PackageSeller")
 
   @@map("users")
 }
@@ -128,6 +130,7 @@ model Client {
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   serviceOrders ServiceOrder[]
+  packages ClientPackage[]
 
   @@map("clients")
 }
@@ -149,6 +152,8 @@ model Service {
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   orderServices OrderService[]
+  packages       ServicePackage[]
+  clientPackages ClientPackage[]
 
   @@map("services")
 }
@@ -187,6 +192,7 @@ model ServiceOrder {
 
   // Serviços da OS
   services OrderService[]
+  packageUsages PackageUsage[]
 
   @@map("service_orders")
 }
@@ -221,6 +227,7 @@ model OrderService {
   // Relações
   orderId String       @map("order_id")
   order   ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  packageUsage PackageUsage?
 
   @@map("order_services")
 }
@@ -341,3 +348,81 @@ enum MessageStatus {
   FAILED     // Falhou
 }
 
+// ==================== PACOTES PRÉ-PAGOS ====================
+
+enum ClientPackageStatus {
+  ACTIVE
+  CANCELLED
+}
+
+// Pacote oferecido pela loja: N unidades de um serviço por um preço fechado
+model ServicePackage {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  quantity    Int
+  price       Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  storeId   String  @map("store_id")
+  store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  // Cascade: no Postgres cada exclusão em cascata roda como statement próprio, então
+  // NoAction/Restrict quebrariam a exclusão de loja/empresa conforme a ordem da cascata.
+  // A API não apaga serviço (só desativa), então isto só age via loja/empresa.
+  serviceId String  @map("service_id")
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  sales ClientPackage[]
+
+  @@map("service_packages")
+}
+
+// Venda de um pacote a um cliente (copia os dados do pacote no momento da venda)
+model ClientPackage {
+  id          String              @id @default(cuid())
+  name        String
+  quantity    Int
+  price       Decimal             @db.Decimal(10, 2)
+  status      ClientPackageStatus @default(ACTIVE)
+  notes       String?
+  soldAt      DateTime            @default(now()) @map("sold_at")
+  cancelledAt DateTime?           @map("cancelled_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  // Cascade em pacote/serviço pelo mesmo motivo (exclusão de loja/empresa). A API só apaga
+  // um ServicePackage sem vendas (senão desativa) e nunca apaga serviço. Excluir o
+  // vendedor mantém o histórico da venda (SetNull).
+  clientId  String         @map("client_id")
+  client    Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  packageId String         @map("package_id")
+  package   ServicePackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  serviceId String         @map("service_id")
+  service   Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  soldById  String?        @map("sold_by_id")
+  soldBy    User?          @relation("PackageSeller", fields: [soldById], references: [id], onDelete: SetNull)
+
+  usages PackageUsage[]
+
+  @@index([clientId, serviceId, status])
+  @@map("client_packages")
+}
+
+// Consumo de saldo por um item de OS. Apagar o item apaga o consumo (devolve saldo).
+model PackageUsage {
+  id        String   @id @default(cuid())
+  quantity  Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  clientPackageId String        @map("client_package_id")
+  clientPackage   ClientPackage @relation(fields: [clientPackageId], references: [id], onDelete: Cascade)
+  orderId         String        @map("order_id")
+  order           ServiceOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderServiceId  String        @unique @map("order_service_id")
+  orderService    OrderService  @relation(fields: [orderServiceId], references: [id], onDelete: Cascade)
+
+  @@index([clientPackageId])
+  @@map("package_usages")
+}

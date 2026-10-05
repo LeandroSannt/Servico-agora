@@ -19,6 +19,7 @@ interface Client {
   _count?: {
     serviceOrders: number
   }
+  balances?: { serviceId: string; serviceName: string; remaining: number }[]
 }
 
 interface ClientsResponse {

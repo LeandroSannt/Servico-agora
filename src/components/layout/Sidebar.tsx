@@ -12,6 +12,7 @@ import {
   Store,
   UserCog,
   Wrench,
+  Package,
   Settings,
   ChevronDown,
   LogOut,
@@ -78,6 +79,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: '/services',
       label: 'Serviços',
       icon: <Wrench className="w-5 h-5" />,
+    },
+    {
+      href: '/packages',
+      label: 'Pacotes',
+      icon: <Package className="w-5 h-5" />,
     },
     {
       label: 'Administração',

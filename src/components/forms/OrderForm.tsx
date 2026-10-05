@@ -5,9 +5,24 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useSession } from 'next-auth/react'
 import { Button, Input, Textarea, Select, Checkbox, Modal } from '@/components/ui'
 import { serviceOrderSchema, type ServiceOrderFormData, clientSchema, type ClientFormData } from '@/lib/validations'
-import { useCreateOrder, useUpdateOrder, useClients, useServices, useCreateClient, useStores } from '@/hooks/api'
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, X, UserPlus, Store } from 'lucide-react'
+import {
+  useCreateOrder,
+  useUpdateOrder,
+  useClients,
+  useServices,
+  useCreateClient,
+  useStores,
+  useClientPackages,
+} from '@/hooks/api'
+import { regroupOrderItems, catalogPriceFromItems } from '@/lib/packages/regroup'
+import {
+  buildBalanceByService,
+  computeEffectiveUse,
+  availableBefore,
+  syncUseWithQuantity,
+} from '@/lib/packages/form-balance'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Plus, Trash2, X, UserPlus, Store, Package } from 'lucide-react'
 
 interface OrderFormProps {
   order?: {
@@ -20,10 +35,13 @@ interface OrderFormProps {
     store: { id: string; name: string }
     services: {
       id: string
+      serviceId: string | null
       serviceName: string
       description: string | null
       price: number
       quantity: number
+      packageUsage?: { quantity: number; clientPackage: { id: string; name: string } } | null
+      service?: { price: number | string } | null
     }[]
   } | null
   onSuccess: () => void
@@ -58,6 +76,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     quantity: 1,
     saveGlobally: false,
     isExisting: false,
+    usePackageQuantity: 0,
   }
 
   const {
@@ -66,6 +85,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     control,
     formState: { errors },
     watch,
+    getValues,
     setValue,
     setError,
   } = useForm<ServiceOrderFormData>({
@@ -75,15 +95,11 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       description: order?.description || '',
       storeId: initialStoreId,
       clientId: order?.client?.id || '',
-      services: order?.services?.map((s) => ({
-        serviceId: '',
-        serviceName: s.serviceName,
-        description: s.description || '',
-        price: s.price,
-        quantity: s.quantity,
-        saveGlobally: false,
-        isExisting: true, // Marcar como serviço existente na OS
-      })) || [emptyServiceItem],
+      // Itens vindos de pacote são reagrupados com o irmão cobrado; itens 100% cobertos (gravados
+      // a R$ 0) recebem o preço atual do serviço vinculado, que a API inclui em cada item
+      services: order?.services
+        ? regroupOrderItems(order.services, catalogPriceFromItems(order.services))
+        : [emptyServiceItem],
     },
   })
 
@@ -94,6 +110,85 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
 
   const watchedServices = watch('services')
   const storeId = watch('storeId')
+  const clientId = watch('clientId')
+  const {
+    data: clientPackages,
+    refetch: refetchBalances,
+    isError: balancesError,
+  } = useClientPackages(clientId)
+
+  // Sem os saldos carregados, o uso efetivo seria 0 e salvar recriaria itens cobertos como cobrados
+  const balancesReady = !clientId || !!clientPackages
+
+  // Saldo por serviço; na edição, os consumos da própria OS voltam a contar como disponíveis
+  const balanceByService = useMemo(
+    () => buildBalanceByService(clientPackages?.balances, clientPackages?.packages, order?.id),
+    [clientPackages, order?.id]
+  )
+
+  // Uso efetivo por item. Sem useMemo de propósito: watch('services') devolve o mesmo array
+  // (mutado no lugar) após setValue em campos aninhados, então a memo ficaria desatualizada.
+  const effectiveUse = computeEffectiveUse(watchedServices ?? [], balanceByService)
+
+  const anyItemUsesPackage = (watchedServices ?? []).some((s) => (Number(s.usePackageQuantity) || 0) > 0)
+  // Carregando: bloqueia sempre. Erro: só bloqueia se alguma linha usa pacote (as demais OS salvam)
+  const submitBlockedByBalances = !balancesReady && (!balancesError || anyItemUsesPackage)
+
+  // Linhas (por fields[i].id) em que o usuário marcou/desmarcou "Usar pacote" manualmente, e linhas
+  // cujo serviço do catálogo foi escolhido antes de os saldos chegarem (recebem o padrão depois)
+  const toggledLineKeys = useRef(new Set<string>())
+  const pendingDefaultLineKeys = useRef(new Set<string>())
+
+  /** Saldo disponível para a linha, descontando o uso efetivo das linhas anteriores do mesmo serviço. */
+  const availableForLine = (index: number) => {
+    const items = getValues('services') ?? []
+    return availableBefore(items, computeEffectiveUse(items, balanceByService), index, balanceByService)
+  }
+
+  // Mantém o uso de pacote em sincronia com a quantidade (só se o item já usa pacote)
+  const syncPackageUseWithQuantity = (index: number, rawQuantity: string) => {
+    const newQuantity = Number(rawQuantity)
+    if (!Number.isInteger(newQuantity) || newQuantity < 1) return
+    const current = Number(getValues(`services.${index}.usePackageQuantity`)) || 0
+    const next = syncUseWithQuantity(current, newQuantity, availableForLine(index))
+    if (next !== current) setValue(`services.${index}.usePackageQuantity`, next)
+  }
+
+  const quantityRegisterOptions = (index: number) => ({
+    valueAsNumber: true as const,
+    onChange: (e: { target: { value: string } }) => syncPackageUseWithQuantity(index, e.target.value),
+  })
+
+  // Saldos pertencem ao cliente anterior: desmarca o uso de pacote de todos os itens
+  const resetPackageUse = () => {
+    const items = getValues('services') ?? []
+    items.forEach((_, i) => setValue(`services.${i}.usePackageQuantity`, 0))
+    toggledLineKeys.current.clear()
+    pendingDefaultLineKeys.current.clear()
+  }
+
+  // Serviço do catálogo escolhido antes de os saldos chegarem: aplica o padrão uma vez quando
+  // chegam, só nas linhas ainda em 0 que o usuário não marcou/desmarcou
+  useEffect(() => {
+    if (!balancesReady || pendingDefaultLineKeys.current.size === 0) return
+    const items = getValues('services') ?? []
+    const use = computeEffectiveUse(items, balanceByService)
+    fields.forEach((field, i) => {
+      if (!pendingDefaultLineKeys.current.has(field.id)) return
+      const item = items[i]
+      if (!item?.serviceId || toggledLineKeys.current.has(field.id)) return
+      if ((Number(item.usePackageQuantity) || 0) > 0) return
+      const defaultUse = Math.min(
+        Number(item.quantity) || 1,
+        availableBefore(items, use, i, balanceByService)
+      )
+      if (defaultUse > 0) {
+        setValue(`services.${i}.usePackageQuantity`, defaultUse)
+        use[i] = defaultUse
+      }
+    })
+    pendingDefaultLineKeys.current.clear()
+  }, [balancesReady, balanceByService, fields, getValues, setValue])
 
   // Lojas disponíveis (só usadas no modo com select; requisição leve, aceita)
   const { data: storesData } = useStores({ limit: 100 })
@@ -105,6 +200,16 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
 
   const { data: servicesData } = useServices({ storeId: storeId, limit: 100 })
   const services = servicesData?.data || []
+
+  // Nome com que cada serviço vinculado entrou no formulário (carregado da OS ou escolhido no
+  // catálogo); só serve de referência quando o serviço não está na lista do catálogo (limit 100)
+  const linkedServiceNames = useRef(
+    new Map<string, string>(
+      (order?.services ?? []).flatMap((s): [string, string][] =>
+        s.serviceId ? [[s.serviceId, s.serviceName]] : []
+      )
+    )
+  )
 
   // New client form
   const {
@@ -136,6 +241,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       const newClient = await createClientMutation.mutateAsync(data)
       // Selecionar o novo cliente automaticamente
       setValue('clientId', newClient.id)
+      resetPackageUse()
       setShowNewClientModal(false)
       resetClientForm()
     } catch (error) {
@@ -148,12 +254,34 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
   useEffect(() => {
     if (createMutation.error || updateMutation.error) {
       const error = createMutation.error || updateMutation.error
-      const axiosError = error as { response?: { data?: { error?: string } } } | null
-      setError('root', {
-        message: axiosError?.response?.data?.error || 'Erro ao salvar ordem de serviço',
-      })
+      const axiosError = error as {
+        response?: {
+          status?: number
+          data?: { error?: string; remaining?: number; serviceId?: string }
+        }
+      } | null
+      if (axiosError?.response?.status === 409) {
+        // Saldo de pacote mudou (ou conflito de concorrência): recarrega os saldos
+        refetchBalances()
+        const data = axiosError.response.data
+        const remaining = data?.remaining
+        const serviceName = data?.serviceId
+          ? (getValues('services') ?? []).find((s) => s.serviceId === data.serviceId)?.serviceName
+          : undefined
+        const packageLabel = serviceName ? `Saldo do pacote de "${serviceName}"` : 'Saldo do pacote'
+        setError('root', {
+          message:
+            remaining !== undefined
+              ? `${packageLabel} mudou: restam ${remaining}. O restante será cobrado; revise e salve de novo.`
+              : data?.error || 'Conflito ao salvar a OS; tente novamente',
+        })
+      } else {
+        setError('root', {
+          message: axiosError?.response?.data?.error || 'Erro ao salvar ordem de serviço',
+        })
+      }
     }
-  }, [createMutation.error, updateMutation.error, setError])
+  }, [createMutation.error, updateMutation.error, setError, refetchBalances, getValues])
 
   const handleServiceSelect = (index: number, serviceId: string) => {
     if (serviceId === 'new') {
@@ -162,20 +290,34 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       setValue(`services.${index}.serviceName`, '')
       setValue(`services.${index}.description`, '')
       setValue(`services.${index}.price`, 0)
+      setValue(`services.${index}.usePackageQuantity`, 0)
     } else if (serviceId) {
       const service = services.find((s) => s.id === serviceId)
       if (service) {
         setValue(`services.${index}.serviceId`, serviceId)
+        linkedServiceNames.current.set(serviceId, service.name)
         setValue(`services.${index}.serviceName`, service.name)
         setValue(`services.${index}.description`, service.description || '')
-        setValue(`services.${index}.price`, service.price)
+        setValue(`services.${index}.price`, Number(service.price))
+        // Com saldo, o pacote é usado por padrão (descontando linhas anteriores do mesmo serviço);
+        // se os saldos ainda não chegaram, o padrão é aplicado quando chegarem
+        const lineKey = fields[index]?.id
+        if (lineKey) toggledLineKeys.current.delete(lineKey)
+        const quantity = Number(getValues(`services.${index}.quantity`)) || 1
+        setValue(`services.${index}.usePackageQuantity`, Math.min(quantity, availableForLine(index)))
+        if (!balancesReady && lineKey) pendingDefaultLineKeys.current.add(lineKey)
         setShowNewService(null)
       }
     }
   }
 
   const calculateTotal = () => {
-    return watchedServices?.reduce((sum, s) => sum + (s.price || 0) * (s.quantity || 1), 0) || 0
+    return (
+      watchedServices?.reduce((sum, s, i) => {
+        const charged = Math.max(0, (Number(s.quantity) || 1) - (effectiveUse[i] ?? 0))
+        return sum + (Number(s.price) || 0) * charged
+      }, 0) || 0
+    )
   }
 
   const formatCurrency = (value: number) => {
@@ -186,14 +328,25 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
   }
 
   const onSubmit = async (data: ServiceOrderFormData) => {
+    if (submitBlockedByBalances) {
+      // O botão já fica desabilitado; guarda extra para não gravar itens cobertos como cobrados
+      setError('root', {
+        message: balancesError
+          ? 'Não foi possível carregar o saldo de pacotes. Tente novamente.'
+          : 'Aguarde o carregamento do saldo de pacotes antes de salvar.',
+      })
+      return
+    }
     try {
-      // Garantir que price e quantity são números
+      // Garantir que price e quantity são números; o uso de pacote enviado nunca passa do saldo
+      const submitUse = computeEffectiveUse(data.services, balanceByService)
       const normalizedData = {
         ...data,
-        services: data.services.map((service) => ({
+        services: data.services.map((service, index) => ({
           ...service,
           price: Number(service.price) || 0,
           quantity: Number(service.quantity) || 1,
+          usePackageQuantity: submitUse[index],
         })),
       }
 
@@ -213,6 +366,19 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       {errors.root && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
           {errors.root.message}
+        </div>
+      )}
+
+      {clientId && balancesError && !clientPackages && (
+        <div className="flex items-center justify-between gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+          <span className="text-amber-800">Não foi possível carregar o saldo de pacotes. Tente novamente.</span>
+          <button
+            type="button"
+            onClick={() => refetchBalances()}
+            className="shrink-0 font-medium text-amber-900 underline hover:text-amber-700"
+          >
+            Tentar novamente
+          </button>
         </div>
       )}
 
@@ -258,7 +424,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                 placeholder={storeId ? 'Selecione o cliente' : 'Selecione a loja primeiro'}
                 error={errors.clientId?.message}
                 disabled={!storeId || !!order}
-                {...register('clientId')}
+                {...register('clientId', { onChange: resetPackageUse })}
               />
             </div>
             {!order && storeId && (
@@ -313,6 +479,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                 quantity: 1,
                 saveGlobally: false,
                 isExisting: false, // Novo serviço adicionado durante edição
+                usePackageQuantity: 0,
               })
             }
           >
@@ -366,7 +533,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                     label="Quantidade"
                     type="number"
                     min="1"
-                    {...register(`services.${index}.quantity` as const, { valueAsNumber: true })}
+                    {...register(`services.${index}.quantity` as const, quantityRegisterOptions(index))}
                   />
                 </div>
               ) : showNewService === index ? (
@@ -390,7 +557,21 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                       label="Nome do Serviço"
                       placeholder="Ex: Reparo específico"
                       error={errors.services?.[index]?.serviceName?.message}
-                      {...register(`services.${index}.serviceName`)}
+                      {...register(`services.${index}.serviceName`, {
+                        onChange: (e) => {
+                          // Só deixa de ser o serviço do catálogo (e de usar pacote) se o nome realmente
+                          // mudou; compara sem espaços nas pontas e sem diferenciar maiúsculas
+                          const linkedId = getValues(`services.${index}.serviceId`)
+                          if (!linkedId) return
+                          const catalogName =
+                            services.find((s) => s.id === linkedId)?.name ??
+                            linkedServiceNames.current.get(linkedId)
+                          const typed = String(e.target.value ?? '').trim().toLowerCase()
+                          if (catalogName !== undefined && typed === catalogName.trim().toLowerCase()) return
+                          setValue(`services.${index}.serviceId`, '')
+                          setValue(`services.${index}.usePackageQuantity`, 0)
+                        },
+                      })}
                     />
                     <Input
                       label="Preço (R$)"
@@ -411,7 +592,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                       label="Quantidade"
                       type="number"
                       min="1"
-                      {...register(`services.${index}.quantity` as const, { valueAsNumber: true })}
+                      {...register(`services.${index}.quantity` as const, quantityRegisterOptions(index))}
                     />
                     <div className="flex items-end pb-2">
                       <Checkbox
@@ -420,9 +601,29 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                       />
                     </div>
                   </div>
+                  {(Number(watchedServices[index]?.usePackageQuantity) || 0) > 0 && (
+                    <p className="flex items-center gap-1.5 text-sm text-blue-700">
+                      <Package className="w-4 h-4 text-blue-600" />
+                      Usa pacote:{' '}
+                      {balancesReady
+                        ? effectiveUse[index] ?? 0
+                        : Number(watchedServices[index]?.usePackageQuantity) || 0}{' '}
+                      un
+                    </p>
+                  )}
                 </div>
-              ) : (
+              ) : (() => {
                 /* Existing service - show details with edit capability */
+                const item = watchedServices[index]
+                const itemServiceId = item.serviceId || ''
+                const qty = Number(item.quantity) || 1
+                const price = Number(item.price) || 0
+                const requested = Number(item.usePackageQuantity) || 0
+                const use = effectiveUse[index] ?? 0
+                const charged = Math.max(0, qty - use)
+                // Saldo que sobra para esta linha depois das linhas anteriores do mesmo serviço
+                const balance = availableBefore(watchedServices ?? [], effectiveUse, index, balanceByService)
+                return (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600 font-medium">
@@ -445,22 +646,57 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                     )}
                     <div className="flex justify-between items-center mt-2">
                       <p className="text-green-600 font-semibold">
-                        {formatCurrency(watchedServices[index].price)} x{' '}
-                        {watchedServices[index].quantity} ={' '}
-                        {formatCurrency(
-                          watchedServices[index].price * watchedServices[index].quantity
-                        )}
+                        {formatCurrency(price)} x {charged} = {formatCurrency(price * charged)}
                       </p>
                       <Input
                         type="number"
                         min="1"
                         className="w-20"
-                        {...register(`services.${index}.quantity` as const, { valueAsNumber: true })}
+                        {...register(`services.${index}.quantity` as const, quantityRegisterOptions(index))}
                       />
                     </div>
                   </div>
+                  {itemServiceId && (balance > 0 || requested > 0) && (
+                    <div className="flex flex-col gap-1 p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                          checked={requested > 0}
+                          onChange={(e) => {
+                            toggledLineKeys.current.add(field.id)
+                            pendingDefaultLineKeys.current.delete(field.id)
+                            setValue(
+                              `services.${index}.usePackageQuantity`,
+                              e.target.checked ? Math.min(qty, balance) || qty : 0
+                            )
+                          }}
+                        />
+                        <Package className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium text-blue-800">Usar pacote</span>
+                        {balancesReady && (
+                          <span className="text-blue-700">· cliente tem {balance} no pacote</span>
+                        )}
+                      </label>
+                      {!balancesReady ? (
+                        <p className="text-gray-600 pl-6">
+                          {balancesError ? 'Saldo indisponível.' : 'Carregando saldo…'}
+                        </p>
+                      ) : requested > 0 && use === 0 ? (
+                        <p className="text-amber-700 pl-6">Sem saldo disponível; será cobrado normalmente.</p>
+                      ) : (
+                        requested > 0 &&
+                        use < qty && (
+                          <p className="text-blue-700 pl-6">
+                            {use} pelo pacote · {qty - use} cobrado a {formatCurrency(price)}
+                          </p>
+                        )
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+                )
+              })()}
             </div>
           ))}
         </div>
@@ -473,7 +709,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       {/* Total */}
       <div className="border-t pt-4">
         <div className="flex justify-between items-center text-lg font-bold">
-          <span>Total:</span>
+          <span className="text-gray-900">Total:</span>
           <span className="text-green-600">{formatCurrency(calculateTotal())}</span>
         </div>
       </div>
@@ -483,8 +719,17 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading} className="w-full sm:w-auto">
           Cancelar
         </Button>
-        <Button type="submit" isLoading={isLoading} className="w-full sm:w-auto">
-          {order ? 'Salvar Alterações' : 'Criar Ordem de Serviço'}
+        <Button
+          type="submit"
+          isLoading={isLoading}
+          disabled={submitBlockedByBalances}
+          className="w-full sm:w-auto"
+        >
+          {submitBlockedByBalances && !balancesError
+            ? 'Carregando saldo de pacotes…'
+            : order
+              ? 'Salvar Alterações'
+              : 'Criar Ordem de Serviço'}
         </Button>
       </div>
 

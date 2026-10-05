@@ -4,6 +4,9 @@ import { updateOrderStatusSchema, serviceOrderSchema } from '@/lib/validations'
 import { sendOrderFinishedEmail } from '@/lib/email/send-email'
 import { sendOrderStatusWhatsApp, sendOrderPaidWhatsApp } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/auth-utils'
+import { createOrderItemsWithPackages, computeOrderTotal } from '@/lib/packages/consume'
+import { orderServicesInclude, displayServiceName } from '@/lib/packages/order-include'
+import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS } from '@/lib/packages/order-request'
 
 // GET /api/orders/[id] - Buscar ordem por ID
 export async function GET(
@@ -28,9 +31,8 @@ export async function GET(
           },
         },
         services: {
-          include: {
-            service: true,
-          },
+          ...orderServicesInclude,
+          include: { ...orderServicesInclude.include, service: true },
         },
       },
     })
@@ -73,7 +75,7 @@ export async function PATCH(
             company: true,
           },
         },
-        services: true,
+        services: orderServicesInclude,
       },
     })
 
@@ -121,7 +123,7 @@ export async function PATCH(
             company: true,
           },
         },
-        services: true,
+        services: orderServicesInclude,
       },
     })
 
@@ -139,7 +141,7 @@ export async function PATCH(
             companyName: order.store.company.name,
             companyId: order.store.company.id,
             services: order.services.map((s) => ({
-              name: s.serviceName,
+              name: displayServiceName(s),
               price: Number(s.price),
               quantity: s.quantity,
               description: s.description,
@@ -170,7 +172,7 @@ export async function PATCH(
         status: status as 'RECEIVED' | 'IN_PROGRESS' | 'PAUSED' | 'FINISHED',
         pausedReason: status === 'PAUSED' ? (pausedReason || undefined) : undefined,
         services: order.services.map((s) => ({
-          name: s.serviceName,
+          name: displayServiceName(s),
           price: Number(s.price),
           quantity: s.quantity,
         })),
@@ -245,6 +247,9 @@ export async function PUT(
     const body = await request.json()
     const validatedData = serviceOrderSchema.parse(body)
 
+    const usageError = packageUsageInputError(validatedData.services)
+    if (usageError) return NextResponse.json({ error: usageError }, { status: 400 })
+
     const existingOrder = await prisma.serviceOrder.findUnique({
       where: { id },
       include: { store: true },
@@ -258,44 +263,36 @@ export async function PUT(
     }
 
     // Calcular novo total
-    const totalAmount = validatedData.services.reduce((sum, service) => {
-      return sum + (service.price * service.quantity)
-    }, 0)
+    const totalAmount = computeOrderTotal(validatedData.services)
 
-    // Atualizar ordem em uma transação
+    // Atualizar ordem em uma transação. A ordem importa:
+    // (a) o update da OS vem PRIMEIRO e trava a linha da ordem: um PUT concorrente da mesma OS
+    //     espera aqui e, ao seguir, seu deleteMany (novo statement) enxerga e apaga os itens deste;
+    //     sem isso os dois conjuntos de itens sobreviveriam e o saldo seria consumido duas vezes.
+    // (b) o deleteMany roda ANTES de travar/ler o saldo no helper: os consumos desta OS são
+    //     apagados por cascata e não contam como usados ao recriar os itens.
+    // A OS é relida dentro da transação: um erro nessa leitura não deixa um 500 após o commit.
     const order = await prisma.$transaction(async (tx) => {
-      // Deletar serviços antigos
-      await tx.orderService.deleteMany({
-        where: { orderId: id },
-      })
-
-      // Atualizar ordem com novos serviços
-      return tx.serviceOrder.update({
+      await tx.serviceOrder.update({
         where: { id },
-        data: {
-          description: validatedData.description,
-          totalAmount,
-          services: {
-            create: validatedData.services.map((service) => ({
-              serviceId: service.serviceId?.trim() || null,
-              serviceName: service.serviceName,
-              description: service.description || null,
-              price: service.price,
-              quantity: service.quantity,
-              saveGlobally: service.saveGlobally ?? false,
-            })),
-          },
-        },
+        data: { description: validatedData.description, totalAmount },
+      })
+      await tx.orderService.deleteMany({ where: { orderId: id } })
+      await createOrderItemsWithPackages(tx, {
+        orderId: id,
+        clientId: existingOrder.clientId,
+        items: validatedData.services,
+      })
+      return tx.serviceOrder.findUniqueOrThrow({
+        where: { id },
         include: {
           client: true,
-          createdBy: {
-            select: { id: true, name: true },
-          },
+          createdBy: { select: { id: true, name: true } },
           store: true,
-          services: true,
+          services: orderServicesInclude,
         },
       })
-    })
+    }, ORDER_TRANSACTION_OPTIONS)
 
     // Salvar serviços novos globalmente se solicitado
     for (const service of validatedData.services) {
@@ -322,6 +319,8 @@ export async function PUT(
     return NextResponse.json(order)
   } catch (error) {
     console.error('Erro ao atualizar ordem:', error)
+    const mapped = packageErrorResponse(error)
+    if (mapped) return mapped
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
         { error: 'Dados inválidos', details: error },

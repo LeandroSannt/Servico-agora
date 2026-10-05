@@ -4,6 +4,9 @@ import { serviceOrderSchema } from '@/lib/validations'
 import { generateOrderNumber } from '@/lib/utils'
 import { requireAuth, getCompanyFilter } from '@/lib/auth-utils'
 import { sendOrderStatusWhatsApp } from '@/lib/whatsapp'
+import { createOrderItemsWithPackages, computeOrderTotal } from '@/lib/packages/consume'
+import { orderServicesInclude, displayServiceName } from '@/lib/packages/order-include'
+import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS } from '@/lib/packages/order-request'
 
 // GET /api/orders - Listar ordens de serviço
 export async function GET(request: NextRequest) {
@@ -80,7 +83,7 @@ export async function GET(request: NextRequest) {
           store: {
             select: { id: true, name: true },
           },
-          services: true,
+          services: orderServicesInclude,
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -115,6 +118,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const validatedData = serviceOrderSchema.parse(body)
+
+    const usageError = packageUsageInputError(validatedData.services)
+    if (usageError) return NextResponse.json({ error: usageError }, { status: 400 })
 
     // Verificar se a loja existe e se o usuário tem permissão
     const store = await prisma.store.findUnique({
@@ -155,47 +161,49 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // O saldo de pacote é da loja: um cliente de outra loja não pode ter OS (nem consumir pacote) aqui
+    if (client.storeId !== validatedData.storeId) {
+      return NextResponse.json(
+        { error: 'Cliente não pertence à loja' },
+        { status: 400 }
+      )
+    }
+
     // Gerar número da ordem
     const orderNumber = generateOrderNumber()
 
     // Calcular total
-    const totalAmount = validatedData.services.reduce((sum, service) => {
-      return sum + (service.price * service.quantity)
-    }, 0)
+    const totalAmount = computeOrderTotal(validatedData.services)
 
-    // Criar ordem com serviços
-    const order = await prisma.serviceOrder.create({
-      data: {
-        orderNumber,
-        description: validatedData.description,
-        storeId: validatedData.storeId,
+    // Criar ordem e itens (com consumo de pacote) em uma transação.
+    // A OS é relida dentro da transação: um erro nessa leitura não deixa um 500 após o commit.
+    const order = await prisma.$transaction(async (tx) => {
+      const created = await tx.serviceOrder.create({
+        data: {
+          orderNumber,
+          description: validatedData.description,
+          storeId: validatedData.storeId,
+          clientId: validatedData.clientId,
+          createdById: user!.id, // Usa o usuário autenticado
+          totalAmount,
+        },
+        select: { id: true },
+      })
+      await createOrderItemsWithPackages(tx, {
+        orderId: created.id,
         clientId: validatedData.clientId,
-        createdById: user!.id, // Usa o usuário autenticado
-        totalAmount,
-        services: {
-          create: validatedData.services.map((service) => ({
-            serviceId: service.serviceId?.trim() || null,
-            serviceName: service.serviceName,
-            description: service.description || null,
-            price: service.price,
-            quantity: service.quantity,
-            saveGlobally: service.saveGlobally ?? false,
-          })),
+        items: validatedData.services,
+      })
+      return tx.serviceOrder.findUniqueOrThrow({
+        where: { id: created.id },
+        include: {
+          client: true,
+          createdBy: { select: { id: true, name: true } },
+          store: { include: { company: true } },
+          services: orderServicesInclude,
         },
-      },
-      include: {
-        client: true,
-        createdBy: {
-          select: { id: true, name: true },
-        },
-        store: {
-          include: {
-            company: true,
-          },
-        },
-        services: true,
-      },
-    })
+      })
+    }, ORDER_TRANSACTION_OPTIONS)
 
     // Enviar notificação WhatsApp para status RECEIVED (nova OS criada)
     try {
@@ -208,7 +216,7 @@ export async function POST(request: NextRequest) {
         companyId: order.store.company.id,
         status: 'RECEIVED',
         services: order.services.map((s) => ({
-          name: s.serviceName,
+          name: displayServiceName(s),
           price: Number(s.price),
           quantity: s.quantity,
         })),
@@ -246,6 +254,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(order, { status: 201 })
   } catch (error) {
     console.error('Erro ao criar ordem:', error)
+    const mapped = packageErrorResponse(error)
+    if (mapped) return mapped
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
         { error: 'Dados inválidos', details: error },

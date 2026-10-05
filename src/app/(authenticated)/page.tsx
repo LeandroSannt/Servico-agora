@@ -270,7 +270,9 @@ export default function Dashboard() {
             <div className="min-w-0">
               <p className="text-blue-100 text-xs sm:text-sm">Faturamento Total</p>
               <p className="text-lg sm:text-2xl font-bold mt-0.5 sm:mt-1 truncate">{formatCurrency(stats?.totalRevenue || 0)}</p>
-              <p className="text-blue-200 text-xs mt-0.5 sm:mt-1">Finalizadas + Pagas</p>
+              <p className="text-blue-200 text-xs mt-0.5 sm:mt-1">
+                Finalizadas + Pagas + Pacotes ({formatCurrency(stats?.packagesRevenue || 0)})
+              </p>
             </div>
             <DollarSign className="h-8 w-8 sm:h-10 sm:w-10 text-blue-200 flex-shrink-0" />
           </div>

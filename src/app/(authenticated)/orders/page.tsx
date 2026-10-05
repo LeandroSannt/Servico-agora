@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Search, Plus, Edit2, Trash2, Eye, ClipboardList, Play, CheckCircle, ArrowRight, Calendar, X, DollarSign, Inbox, Pause, MoreVertical } from 'lucide-react'
 import { Button, Input, Modal, Badge, EmptyState, Select, Textarea } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui'
@@ -9,10 +9,13 @@ import { useOrders, useDeleteOrder, useUpdateOrderStatus } from '@/hooks/api'
 
 interface OrderService {
   id: string
+  serviceId: string | null
   serviceName: string
   description: string | null
   price: number
   quantity: number
+  packageUsage?: { quantity: number; clientPackage: { id: string; name: string } } | null
+  service?: { price: number | string } | null
 }
 
 interface Order {
@@ -96,6 +99,10 @@ function getDateRange(period: string): { startDate?: string; endDate?: string } 
 
 export default function OrdersPage() {
   const [search, setSearch] = useState('')
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('search')
+    if (q) setSearch(q)
+  }, [])
   const [statusFilter, setStatusFilter] = useState('')
   const [periodFilter, setPeriodFilter] = useState('')
   const [customStartDate, setCustomStartDate] = useState('')
@@ -604,7 +611,10 @@ export default function OrdersPage() {
                     className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-gray-50 p-3 rounded-lg gap-1 sm:gap-4"
                   >
                     <div className="min-w-0">
-                      <p className="font-medium text-sm sm:text-base text-gray-900 truncate">{service.serviceName}</p>
+                      <p className="font-medium text-sm sm:text-base text-gray-900 truncate">
+                        {service.serviceName}
+                        {service.packageUsage && <span className="ml-1 text-xs text-blue-600">(pacote)</span>}
+                      </p>
                       {service.description && (
                         <p className="text-xs sm:text-sm text-gray-700 truncate">{service.description}</p>
                       )}

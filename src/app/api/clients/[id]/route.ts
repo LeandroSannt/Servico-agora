@@ -104,6 +104,15 @@ export async function DELETE(
       )
     }
 
+    // Vendas de pacote já foram pagas e somam na receita; o cascade as apagaria junto com o cliente
+    const soldPackages = await prisma.clientPackage.count({ where: { clientId: id } })
+    if (soldPackages > 0) {
+      return NextResponse.json(
+        { error: 'Cliente possui pacotes vendidos e não pode ser excluído' },
+        { status: 400 }
+      )
+    }
+
     await prisma.client.delete({
       where: { id },
     })
