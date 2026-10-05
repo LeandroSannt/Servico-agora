@@ -265,31 +265,34 @@ export async function PUT(
     // Calcular novo total
     const totalAmount = computeOrderTotal(validatedData.services)
 
-    // Atualizar ordem em uma transação.
-    // deleteMany ANTES de ler saldo: os consumos desta OS são apagados por cascata
-    // e não contam como usados ao recriar os itens.
-    await prisma.$transaction(async (tx) => {
-      await tx.orderService.deleteMany({ where: { orderId: id } })
+    // Atualizar ordem em uma transação. A ordem importa:
+    // (a) o update da OS vem PRIMEIRO e trava a linha da ordem: um PUT concorrente da mesma OS
+    //     espera aqui e, ao seguir, seu deleteMany (novo statement) enxerga e apaga os itens deste;
+    //     sem isso os dois conjuntos de itens sobreviveriam e o saldo seria consumido duas vezes.
+    // (b) o deleteMany roda ANTES de travar/ler o saldo no helper: os consumos desta OS são
+    //     apagados por cascata e não contam como usados ao recriar os itens.
+    // A OS é relida dentro da transação: um erro nessa leitura não deixa um 500 após o commit.
+    const order = await prisma.$transaction(async (tx) => {
       await tx.serviceOrder.update({
         where: { id },
         data: { description: validatedData.description, totalAmount },
       })
+      await tx.orderService.deleteMany({ where: { orderId: id } })
       await createOrderItemsWithPackages(tx, {
         orderId: id,
         clientId: existingOrder.clientId,
         items: validatedData.services,
       })
+      return tx.serviceOrder.findUniqueOrThrow({
+        where: { id },
+        include: {
+          client: true,
+          createdBy: { select: { id: true, name: true } },
+          store: true,
+          services: orderServicesInclude,
+        },
+      })
     }, ORDER_TRANSACTION_OPTIONS)
-
-    const order = await prisma.serviceOrder.findUniqueOrThrow({
-      where: { id },
-      include: {
-        client: true,
-        createdBy: { select: { id: true, name: true } },
-        store: true,
-        services: orderServicesInclude,
-      },
-    })
 
     // Salvar serviços novos globalmente se solicitado
     for (const service of validatedData.services) {

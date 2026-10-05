@@ -5,7 +5,7 @@ export const orderServiceSchema = z.object({
   serviceName: z.string().min(1, 'Nome do serviço é obrigatório'),
   description: z.string().optional(),
   price: z.coerce.number().min(0, 'Preço deve ser maior ou igual a zero'),
-  quantity: z.coerce.number().min(1, 'Quantidade deve ser pelo menos 1'),
+  quantity: z.coerce.number().int('Quantidade deve ser inteira').min(1, 'Quantidade deve ser pelo menos 1'),
   saveGlobally: z.boolean().optional(),
   isExisting: z.boolean().optional(), // Serviço já existe na OS (não deve ser salvo globalmente)
   // Unidades deste item que saem do saldo de pacote do cliente (o servidor zera o preço)

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
-import { InsufficientBalanceError } from './errors'
+import { InsufficientBalanceError, InvalidPackageUsageError } from './errors'
 
 interface ItemUse {
   serviceId?: string | null
@@ -29,7 +29,7 @@ export function packageErrorResponse(error: unknown): NextResponse | null {
   if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2028')) {
     return NextResponse.json({ error: 'Conflito ao salvar a OS; tente novamente' }, { status: 409 })
   }
-  if (error instanceof RangeError) {
+  if (error instanceof InvalidPackageUsageError) {
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
   return null

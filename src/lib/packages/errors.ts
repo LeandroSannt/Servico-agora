@@ -9,3 +9,12 @@ export class InsufficientBalanceError extends Error {
     this.name = 'InsufficientBalanceError'
   }
 }
+
+// Item da OS com uso de pacote inválido (sem serviço cadastrado ou maior que a quantidade).
+// A rota captura e responde 400 { error }.
+export class InvalidPackageUsageError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'InvalidPackageUsageError'
+  }
+}

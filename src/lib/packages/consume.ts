@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client'
 import { toBalances, type PackageBalance } from './balance'
 import { allocateFifo } from './allocate'
 import { splitOrderItem, type OrderItemInput } from './split'
+import { InvalidPackageUsageError } from './errors'
 
 interface Params {
   orderId: string
@@ -11,9 +12,12 @@ interface Params {
 
 /**
  * Cria os itens da OS (divididos em coberto/cobrado) e os consumos de pacote.
- * Deve rodar dentro de `prisma.$transaction`. No PUT, o `deleteMany` dos itens antigos
- * precisa rodar ANTES, para o saldo lido aqui já não contar o consumo da própria OS.
- * Lança InsufficientBalanceError se o saldo não cobre.
+ * Deve rodar dentro de `prisma.$transaction`. No PUT, a transação precisa (a) travar a linha
+ * da OS antes de tudo (o `update` da ordem), para PUTs concorrentes da mesma OS se serializarem,
+ * e (b) rodar o `deleteMany` dos itens antigos antes desta função, para o saldo lido aqui já não
+ * contar o consumo da própria OS.
+ * Lança InsufficientBalanceError se o saldo não cobre e InvalidPackageUsageError se um item
+ * usa pacote sem serviço cadastrado ou além da sua quantidade.
  */
 export async function createOrderItemsWithPackages(tx: Prisma.TransactionClient, { orderId, clientId, items }: Params) {
   // Saldos por serviço, carregados sob lock só para os serviços que vão usar pacote
@@ -60,7 +64,7 @@ export async function createOrderItemsWithPackages(tx: Prisma.TransactionClient,
     const use = item.usePackageQuantity ?? 0
     const serviceId = item.serviceId?.trim() || null
     if (use > item.quantity || (use > 0 && !serviceId)) {
-      throw new RangeError('usePackageQuantity inválido para o item')
+      throw new InvalidPackageUsageError('usePackageQuantity inválido para o item')
     }
     let allocations: { clientPackageId: string; quantity: number }[] = []
 

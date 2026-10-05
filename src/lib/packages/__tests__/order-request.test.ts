@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { Prisma } from '@prisma/client'
 import { packageUsageInputError, packageErrorResponse } from '@/lib/packages/order-request'
-import { InsufficientBalanceError } from '@/lib/packages/errors'
+import { InsufficientBalanceError, InvalidPackageUsageError } from '@/lib/packages/errors'
 
 describe('packageUsageInputError', () => {
   it('aceita itens sem uso de pacote', () => {
@@ -45,10 +45,15 @@ describe('packageErrorResponse', () => {
     expect(packageErrorResponse(new Prisma.PrismaClientKnownRequestError('x', { code: 'P2002', clientVersion: 'test' }))).toBeNull()
   })
 
-  it('mapeia RangeError para 400', async () => {
-    const res = packageErrorResponse(new RangeError('usePackageQuantity inválido para o item'))
+  it('mapeia InvalidPackageUsageError para 400', async () => {
+    const res = packageErrorResponse(new InvalidPackageUsageError('usePackageQuantity inválido para o item'))
+    expect(res).not.toBeNull()
     expect(res!.status).toBe(400)
     expect(await res!.json()).toEqual({ error: 'usePackageQuantity inválido para o item' })
+  })
+
+  it('não mapeia RangeError genérico (erro de programação vira 500)', () => {
+    expect(packageErrorResponse(new RangeError('x'))).toBeNull()
   })
 
   it('devolve null para erro genérico', () => {

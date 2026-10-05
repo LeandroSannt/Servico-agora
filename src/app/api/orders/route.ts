@@ -175,8 +175,9 @@ export async function POST(request: NextRequest) {
     // Calcular total
     const totalAmount = computeOrderTotal(validatedData.services)
 
-    // Criar ordem e itens (com consumo de pacote) em uma transação
-    const orderId = await prisma.$transaction(async (tx) => {
+    // Criar ordem e itens (com consumo de pacote) em uma transação.
+    // A OS é relida dentro da transação: um erro nessa leitura não deixa um 500 após o commit.
+    const order = await prisma.$transaction(async (tx) => {
       const created = await tx.serviceOrder.create({
         data: {
           orderNumber,
@@ -193,18 +194,16 @@ export async function POST(request: NextRequest) {
         clientId: validatedData.clientId,
         items: validatedData.services,
       })
-      return created.id
+      return tx.serviceOrder.findUniqueOrThrow({
+        where: { id: created.id },
+        include: {
+          client: true,
+          createdBy: { select: { id: true, name: true } },
+          store: { include: { company: true } },
+          services: orderServicesInclude,
+        },
+      })
     }, ORDER_TRANSACTION_OPTIONS)
-
-    const order = await prisma.serviceOrder.findUniqueOrThrow({
-      where: { id: orderId },
-      include: {
-        client: true,
-        createdBy: { select: { id: true, name: true } },
-        store: { include: { company: true } },
-        services: orderServicesInclude,
-      },
-    })
 
     // Enviar notificação WhatsApp para status RECEIVED (nova OS criada)
     try {
