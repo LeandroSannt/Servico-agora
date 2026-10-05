@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import prisma from '@/lib/prisma'
 import { authConfig } from './auth.config'
+import { companyLogoUrl } from './company-logo'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -26,6 +27,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 id: true,
                 name: true,
                 logoUrl: true,
+                logoMimeType: true,
+                logoUpdatedAt: true,
                 primaryColor: true,
                 secondaryColor: true,
                 isActive: true,
@@ -78,7 +81,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           company: user.company ? {
             id: user.company.id,
             name: user.company.name,
-            logoUrl: user.company.logoUrl,
+            logoUrl: companyLogoUrl(user.company),
             primaryColor: user.company.primaryColor,
             secondaryColor: user.company.secondaryColor,
           } : null,

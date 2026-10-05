@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { companySchema } from '@/lib/validations'
 import { requireRoles } from '@/lib/auth-utils'
+import { InvalidLogoError } from '@/lib/company-logo'
+import { logoUpdateData, toPublicCompany } from '@/lib/company-logo-data'
 
 // GET /api/companies - Listar empresas
 export async function GET(request: NextRequest) {
@@ -40,7 +42,7 @@ export async function GET(request: NextRequest) {
     ])
 
     return NextResponse.json({
-      data: companies,
+      data: companies.map(toPublicCompany),
       pagination: {
         page,
         limit,
@@ -64,7 +66,7 @@ export async function POST(request: NextRequest) {
     if (error) return error
 
     const body = await request.json()
-    const validatedData = companySchema.parse(body)
+    const { logo, ...validatedData } = companySchema.parse(body)
 
     const existingCompany = await prisma.company.findFirst({
       where: {
@@ -85,13 +87,16 @@ export async function POST(request: NextRequest) {
     const company = await prisma.company.create({
       data: {
         ...validatedData,
-        logoUrl: validatedData.logoUrl || null,
+        ...logoUpdateData(logo),
       },
     })
 
-    return NextResponse.json(company, { status: 201 })
+    return NextResponse.json(toPublicCompany(company), { status: 201 })
   } catch (error) {
     console.error('Erro ao criar empresa:', error)
+    if (error instanceof InvalidLogoError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
         { error: 'Dados inválidos', details: error },

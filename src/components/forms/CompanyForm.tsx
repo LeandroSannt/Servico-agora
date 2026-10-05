@@ -55,7 +55,6 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
       zipCode: company?.zipCode || '',
       primaryColor: company?.primaryColor || '#3B82F6',
       secondaryColor: company?.secondaryColor || '#1E40AF',
-      logoUrl: company?.logoUrl || '',
       isActive: company?.isActive ?? true,
     },
   })
@@ -210,13 +209,6 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
                 error={errors.secondaryColor?.message}
               />
             </div>
-          </div>
-          <div>
-            <Input
-              label="URL do Logo"
-              placeholder="https://..."
-              {...register('logoUrl')}
-            />
           </div>
         </div>
 
