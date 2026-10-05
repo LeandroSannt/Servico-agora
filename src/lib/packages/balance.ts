@@ -40,3 +40,27 @@ export function toBalances(packages: PackageWithUsages[], editingOrderId?: strin
 export function computeBalance(packages: PackageWithUsages[], editingOrderId?: string | null): number {
   return toBalances(packages, editingOrderId).reduce((sum, b) => sum + b.remaining, 0)
 }
+
+export interface ServiceBalance {
+  serviceId: string
+  serviceName: string
+  remaining: number
+}
+
+/**
+ * Soma o saldo por serviço de pacotes ACTIVE (o chamador filtra o status).
+ * Omite serviços sem saldo; preserva a ordem de primeira aparição.
+ */
+export function aggregateServiceBalances(
+  packages: (PackageWithUsages & { service: { id: string; name: string } })[]
+): ServiceBalance[] {
+  const byService = new Map<string, ServiceBalance>()
+  for (const pkg of packages) {
+    const remaining = remainingOf(pkg)
+    if (remaining <= 0) continue
+    const entry = byService.get(pkg.service.id)
+    if (entry) entry.remaining += remaining
+    else byService.set(pkg.service.id, { serviceId: pkg.service.id, serviceName: pkg.service.name, remaining })
+  }
+  return Array.from(byService.values())
+}

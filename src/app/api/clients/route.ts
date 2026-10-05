@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { clientSchema } from '@/lib/validations'
 import { requireAuth, getCompanyFilter, getStoreFilter } from '@/lib/auth-utils'
+import { getBalancesByClient } from '@/lib/packages/client-packages'
 
 // GET /api/clients - Listar clientes
 export async function GET(request: NextRequest) {
@@ -61,8 +62,10 @@ export async function GET(request: NextRequest) {
       prisma.client.count({ where }),
     ])
 
+    const balancesByClient = await getBalancesByClient(clients.map((c) => c.id))
+
     return NextResponse.json({
-      data: clients,
+      data: clients.map((c) => ({ ...c, balances: balancesByClient.get(c.id) ?? [] })),
       pagination: {
         page,
         limit,

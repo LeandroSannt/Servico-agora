@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { remainingOf, toBalances, computeBalance, type PackageWithUsages } from '@/lib/packages/balance'
+import {
+  remainingOf,
+  toBalances,
+  computeBalance,
+  aggregateServiceBalances,
+  type PackageWithUsages,
+} from '@/lib/packages/balance'
 
 const d = (s: string) => new Date(s)
 
@@ -51,5 +57,33 @@ describe('computeBalance', () => {
   })
   it('credita consumo da OS em edição', () => {
     expect(computeBalance([pkgA, pkgB], 'os2')).toBe(12)
+  })
+})
+
+describe('aggregateServiceBalances', () => {
+  const svcA = { id: 'sA', name: 'Corte' }
+  const svcB = { id: 'sB', name: 'Barba' }
+  const withSvc = (p: PackageWithUsages, service: { id: string; name: string }) => ({ ...p, service })
+
+  it('soma pacotes do mesmo servico', () => {
+    expect(aggregateServiceBalances([withSvc(pkgA, svcA), withSvc(pkgB, svcA)])).toEqual([
+      { serviceId: 'sA', serviceName: 'Corte', remaining: 10 },
+    ])
+  })
+  it('omite pacote totalmente usado', () => {
+    const used = withSvc({ ...pkgB, usages: [{ quantity: 5, orderId: 'x' }] }, svcA)
+    expect(aggregateServiceBalances([withSvc(pkgA, svcA), used])).toEqual([
+      { serviceId: 'sA', serviceName: 'Corte', remaining: 5 },
+    ])
+  })
+  it('servico com todos os pacotes usados nao aparece', () => {
+    const used = withSvc({ ...pkgB, usages: [{ quantity: 5, orderId: 'x' }] }, svcA)
+    expect(aggregateServiceBalances([used])).toEqual([])
+  })
+  it('mantem servicos separados na ordem de primeira aparicao', () => {
+    expect(aggregateServiceBalances([withSvc(pkgB, svcB), withSvc(pkgA, svcA)])).toEqual([
+      { serviceId: 'sB', serviceName: 'Barba', remaining: 5 },
+      { serviceId: 'sA', serviceName: 'Corte', remaining: 5 },
+    ])
   })
 })
