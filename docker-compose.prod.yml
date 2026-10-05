@@ -46,8 +46,7 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      # ":80" = HTTP pelo IP. Com dominio (ex.: app.seudominio.com.br) o Caddy gera HTTPS sozinho.
-      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      SITE_DOMAIN: ${SITE_DOMAIN:-servicoagora.com.br}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

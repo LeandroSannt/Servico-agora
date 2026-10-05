@@ -44,9 +44,9 @@ docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 ## 4. Dominio e HTTPS
-Aponte um registro A do dominio para o IP da VPS. No `.env`, defina
-`SITE_ADDRESS=app.seudominio.com.br`, `AUTH_URL` e `NEXTAUTH_URL` com `https://`.
-Depois: `docker compose -f docker-compose.prod.yml up -d`. O Caddy emite o certificado.
+O Caddy ja esta configurado para `servicoagora.com.br` e `www` (variavel `SITE_DOMAIN`).
+Basta apontar os registros A de `servicoagora.com.br` e `www` para o IP da VPS; o certificado
+e emitido automaticamente em ate alguns minutos. O acesso pelo IP (HTTP) continua funcionando.
 
 ## Comandos uteis
 ```bash

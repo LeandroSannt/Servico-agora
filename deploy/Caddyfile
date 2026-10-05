@@ -1,4 +1,11 @@
-{$SITE_ADDRESS} {
+# Dominio com HTTPS automatico (Let's Encrypt). Enquanto o DNS nao apontar
+# para esta VPS, o Caddy fica tentando emitir o certificado em segundo plano.
+{$SITE_DOMAIN:servicoagora.com.br}, www.{$SITE_DOMAIN:servicoagora.com.br} {
 	encode gzip zstd
+	reverse_proxy app:3000
+}
+
+# Acesso direto pelo IP (HTTP) continua funcionando
+:80 {
 	reverse_proxy app:3000
 }
