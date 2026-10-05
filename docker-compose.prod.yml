@@ -1,0 +1,60 @@
+# Producao (VPS). Deploy normal e feito pelo GitHub Actions (deploy/deploy.sh).
+# Build local na VPS, se precisar: docker compose -f docker-compose.prod.yml up -d --build
+# Postgres fica so na rede interna; Caddy expoe 80/443 e faz proxy para o app.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: servico-agora-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-servico_agora}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-servico_agora}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: ghcr.io/leandrosannt/servico-agora:${APP_IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: servico-agora-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      AUTH_TRUST_HOST: "true"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-servico_agora}?schema=public
+      DIRECT_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-servico_agora}?schema=public
+    expose:
+      - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: servico-agora-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:-servicoagora.com.br}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
