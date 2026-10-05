@@ -28,6 +28,15 @@ describe('toBalances', () => {
       { id: 'B', remaining: 5 },
     ])
   })
+  it('desempata soldAt igual por id', () => {
+    const same = d('2026-03-01')
+    const x: PackageWithUsages = { id: 'X', quantity: 1, soldAt: same, usages: [] }
+    const y: PackageWithUsages = { id: 'Y', quantity: 2, soldAt: same, usages: [] }
+    expect(toBalances([y, x])).toEqual([
+      { id: 'X', remaining: 1 },
+      { id: 'Y', remaining: 2 },
+    ])
+  })
   it('exclui pacotes zerados', () => {
     expect(toBalances([{ ...pkgB, usages: [{ quantity: 5, orderId: 'x' }] }])).toEqual([])
   })

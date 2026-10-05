@@ -14,6 +14,7 @@ export interface AllocationResult {
 
 /** Distribui `qty` pelos pacotes na ordem recebida (FIFO). Lança se o saldo não cobre. */
 export function allocateFifo(balances: PackageBalance[], qty: number, serviceId: string): AllocationResult {
+  if (!Number.isInteger(qty) || qty < 0) throw new RangeError('Quantidade deve ser inteira e >= 0')
   const total = balances.reduce((sum, b) => sum + b.remaining, 0)
   if (qty > total) throw new InsufficientBalanceError(serviceId, total)
 

@@ -41,4 +41,9 @@ describe('allocateFifo', () => {
     allocateFifo(input, 3, 'svc')
     expect(input).toEqual(balances)
   })
+  it('rejeita quantidade inválida com RangeError', () => {
+    expect(() => allocateFifo(balances, -1, 'svc')).toThrowError(RangeError)
+    expect(() => allocateFifo(balances, 1.5, 'svc')).toThrowError(RangeError)
+    expect(() => allocateFifo(balances, NaN, 'svc')).toThrowError(RangeError)
+  })
 })
