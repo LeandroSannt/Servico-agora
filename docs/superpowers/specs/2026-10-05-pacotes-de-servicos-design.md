@@ -93,7 +93,7 @@ Relações inversas: `ClientPackage.usages`, `ServiceOrder.packageUsages`, `Orde
 
 ### Migração
 
-Só tabelas e enum novos; nenhuma coluna existente muda. Em produção o entrypoint roda `prisma db push`, que cria as tabelas. Localmente, `npm run db:push`.
+Só tabelas e enum novos; nenhuma coluna existente muda. Em produção o entrypoint roda `prisma db push`, que cria as tabelas. Localmente, `npm run db:push` (o script passa a incluir `--config prisma/prisma.config.ts`, exigido pelo Prisma 7 porque o config não está na raiz).
 
 ## API
 

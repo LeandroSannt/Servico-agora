@@ -255,20 +255,34 @@ model PackageUsage {
 }
 ```
 
-- [ ] **Step 3: Aplicar no banco local e gerar client**
+- [ ] **Step 3: Corrigir o script `db:push`**
 
-Run: `npx prisma db push`
+O config do Prisma fica em `prisma/prisma.config.ts` e o Prisma 7 só procura na raiz; sem `--config` o comando falha com "The datasource.url property is required". Em `package.json`, trocar:
+
+```json
+    "db:push": "prisma db push",
+```
+
+por:
+
+```json
+    "db:push": "prisma db push --config prisma/prisma.config.ts",
+```
+
+- [ ] **Step 4: Aplicar no banco local e gerar client**
+
+Run: `npm run db:push`
 Expected: `Your database is now in sync with your Prisma schema.` e `Generated Prisma Client`.
 
-- [ ] **Step 4: Tipos**
+- [ ] **Step 5: Tipos**
 
 Run: `npx tsc --noEmit`
 Expected: sucesso.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add prisma/schema.prisma
+git add prisma/schema.prisma package.json
 git commit -m "feat(pacotes): schema de pacotes, vendas e consumos"
 ```
 
@@ -883,17 +897,13 @@ git commit -m "feat(pacotes): helpers de acesso, include da OS e consumo transac
 - Create: `src/app/api/packages/route.ts`
 - Create: `src/app/api/packages/[id]/route.ts`
 
-- [ ] **Step 1: Lista e criação**
+- [ ] **Step 1: Serializador (fora do `route.ts`)**
 
-Criar `src/app/api/packages/route.ts`:
+Next.js só permite exportar handlers de arquivos `route.ts` (o build falha, como já aconteceu com `sanitizeConfig`). Por isso o include e o cálculo derivado ficam em módulo próprio.
+
+Criar `src/lib/packages/package-serializer.ts`:
 
 ```ts
-import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
-import { servicePackageSchema } from '@/lib/validations'
-import { requireAuth, requireRoles, getCompanyFilter, getStoreFilter } from '@/lib/auth-utils'
-import { denyIfNoStoreAccess } from '@/lib/packages/store-access'
-
 export const packageInclude = {
   store: { select: { id: true, name: true } },
   service: { select: { id: true, name: true, price: true, isActive: true } },
@@ -914,6 +924,45 @@ export function withDerived<T extends PackageRow>(pkg: T) {
   const savingsPercent = servicePrice > 0 ? Math.round((1 - unitPrice / servicePrice) * 100) : 0
   return { ...pkg, price, unitPrice, savingsPercent }
 }
+```
+
+Criar `src/lib/packages/__tests__/package-serializer.test.ts`:
+
+```ts
+import { describe, it, expect } from 'vitest'
+import { withDerived } from '@/lib/packages/package-serializer'
+
+describe('withDerived', () => {
+  it('calcula preco unitario e economia', () => {
+    const r = withDerived({ price: '250', quantity: 10, service: { price: '30' } })
+    expect(r.price).toBe(250)
+    expect(r.unitPrice).toBe(25)
+    expect(r.savingsPercent).toBe(17)
+  })
+  it('pacote mais caro que o avulso da economia negativa sem quebrar', () => {
+    const r = withDerived({ price: 400, quantity: 10, service: { price: 30 } })
+    expect(r.savingsPercent).toBe(-33)
+  })
+  it('servico sem preco da economia zero', () => {
+    expect(withDerived({ price: 100, quantity: 4, service: { price: 0 } }).savingsPercent).toBe(0)
+  })
+})
+```
+
+Run: `npm test -- package-serializer`
+Expected: 3 passed.
+
+- [ ] **Step 2: Lista e criação**
+
+Criar `src/app/api/packages/route.ts`:
+
+```ts
+import { NextRequest, NextResponse } from 'next/server'
+import prisma from '@/lib/prisma'
+import { servicePackageSchema } from '@/lib/validations'
+import { requireAuth, requireRoles, getCompanyFilter, getStoreFilter } from '@/lib/auth-utils'
+import { denyIfNoStoreAccess } from '@/lib/packages/store-access'
+import { packageInclude, withDerived } from '@/lib/packages/package-serializer'
 
 // GET /api/packages?storeId=&isActive=&sellable=&search=
 export async function GET(request: NextRequest) {
@@ -929,7 +978,8 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = { ...getStoreFilter(user!) }
 
-    if (['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(user!.role)) {
+    // Diferente de /api/services: MANAGER também fica restrito à própria empresa (spec)
+    if (['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'].includes(user!.role)) {
       const companyFilter = getCompanyFilter(user!)
       if (companyFilter.companyId) where.store = { companyId: companyFilter.companyId }
     }
@@ -1009,15 +1059,7 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-Nota: Next.js só permite exportar handlers de arquivos `route.ts`. `packageInclude` e `withDerived` **não podem** ficar exportados aqui (o build falha, como já aconteceu com `sanitizeConfig`). Mover ambos para `src/lib/packages/package-serializer.ts` e importar nas duas rotas:
-
-Criar `src/lib/packages/package-serializer.ts` com o conteúdo de `packageInclude`, `PackageRow` e `withDerived` acima (com `export`), e em `route.ts` substituir as definições por:
-
-```ts
-import { packageInclude, withDerived } from '@/lib/packages/package-serializer'
-```
-
-- [ ] **Step 2: Detalhe, edição e exclusão**
+- [ ] **Step 3: Detalhe, edição e exclusão**
 
 Criar `src/app/api/packages/[id]/route.ts`:
 
@@ -1117,12 +1159,12 @@ export async function DELETE(_request: NextRequest, { params }: Ctx) {
 }
 ```
 
-- [ ] **Step 3: Tipos**
+- [ ] **Step 4: Tipos**
 
 Run: `npx tsc --noEmit`
 Expected: sucesso.
 
-- [ ] **Step 4: Teste manual rápido com o dev server**
+- [ ] **Step 5: Teste manual rápido com o dev server**
 
 Run: `npm run dev` (porta 3001 conforme ambiente local) e, logado como admin, no console do navegador:
 
@@ -1132,10 +1174,10 @@ await fetch('/api/packages').then(r => r.json())
 
 Expected: `{ data: [] }`.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/app/api/packages src/lib/packages/package-serializer.ts
+git add src/app/api/packages src/lib/packages/package-serializer.ts src/lib/packages/__tests__/package-serializer.test.ts
 git commit -m "feat(pacotes): API de pacotes (CRUD com soft delete apos venda)"
 ```
 
@@ -1185,6 +1227,7 @@ export async function getBalancesByClient(clientIds: string[]): Promise<Map<stri
   const packages = await prisma.clientPackage.findMany({
     where: { clientId: { in: clientIds }, status: 'ACTIVE' },
     select: {
+      id: true,
       clientId: true,
       quantity: true,
       soldAt: true,
@@ -1968,8 +2011,17 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
     }
     try {
       if (pkg) {
-        const { storeId: _s, serviceId: _v, ...rest } = normalized
-        await updateMutation.mutateAsync({ id: pkg.id, data: rest })
+        // Loja e serviço são imutáveis; não enviar
+        await updateMutation.mutateAsync({
+          id: pkg.id,
+          data: {
+            name: normalized.name,
+            description: normalized.description,
+            quantity: normalized.quantity,
+            price: normalized.price,
+            isActive: normalized.isActive,
+          },
+        })
       } else {
         await createMutation.mutateAsync(normalized)
       }
