@@ -19,27 +19,49 @@ export async function createOrderItemsWithPackages(tx: Prisma.TransactionClient,
   // Saldos por serviço, carregados sob lock só para os serviços que vão usar pacote
   const balancesByService = new Map<string, PackageBalance[]>()
 
-  for (const item of items) {
-    const use = item.usePackageQuantity ?? 0
-    const serviceId = item.serviceId?.trim()
-    if (use <= 0 || !serviceId || balancesByService.has(serviceId)) continue
+  const serviceIds = [
+    ...new Set(
+      items
+        .filter((i) => (i.usePackageQuantity ?? 0) > 0)
+        .map((i) => i.serviceId?.trim())
+        .filter((id): id is string => !!id)
+    ),
+  ]
 
-    // Serializa salvamentos concorrentes do mesmo cliente+serviço (Prisma não expõe FOR UPDATE)
-    await tx.$queryRaw`
+  if (serviceIds.length > 0) {
+    // Um único lock para todos os serviços, sempre em ORDER BY id: transações concorrentes do
+    // mesmo cliente travam na mesma ordem (sem deadlock). Prisma não expõe FOR UPDATE.
+    const locked = await tx.$queryRaw<{ id: string }[]>`
       SELECT id FROM client_packages
-      WHERE client_id = ${clientId} AND service_id = ${serviceId} AND status = 'ACTIVE'
+      WHERE client_id = ${clientId} AND service_id = ANY(${serviceIds}) AND status = 'ACTIVE'
+      ORDER BY id
       FOR UPDATE`
 
+    // O conjunto travado e o conjunto lido precisam ser exatamente as mesmas linhas
+    // (linhas travadas não mudam de status enquanto o lock durar; um pacote vendido depois do
+    // lock não entra no cálculo).
     const packages = await tx.clientPackage.findMany({
-      where: { clientId, serviceId, status: 'ACTIVE' },
-      select: { id: true, quantity: true, soldAt: true, usages: { select: { quantity: true, orderId: true } } },
+      where: { id: { in: locked.map((r) => r.id) } },
+      select: {
+        id: true,
+        serviceId: true,
+        quantity: true,
+        soldAt: true,
+        usages: { select: { quantity: true, orderId: true } },
+      },
     })
-    balancesByService.set(serviceId, toBalances(packages))
+
+    for (const serviceId of serviceIds) {
+      balancesByService.set(serviceId, toBalances(packages.filter((p) => p.serviceId === serviceId)))
+    }
   }
 
   for (const item of items) {
     const use = item.usePackageQuantity ?? 0
     const serviceId = item.serviceId?.trim() || null
+    if (use > item.quantity || (use > 0 && !serviceId)) {
+      throw new RangeError('usePackageQuantity inválido para o item')
+    }
     let allocations: { clientPackageId: string; quantity: number }[] = []
 
     if (use > 0 && serviceId) {
