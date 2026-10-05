@@ -19,14 +19,14 @@ export async function createOrderItemsWithPackages(tx: Prisma.TransactionClient,
   // Saldos por serviço, carregados sob lock só para os serviços que vão usar pacote
   const balancesByService = new Map<string, PackageBalance[]>()
 
-  const serviceIds = [
-    ...new Set(
+  const serviceIds = Array.from(
+    new Set(
       items
         .filter((i) => (i.usePackageQuantity ?? 0) > 0)
         .map((i) => i.serviceId?.trim())
         .filter((id): id is string => !!id)
-    ),
-  ]
+    )
+  )
 
   if (serviceIds.length > 0) {
     // Um único lock para todos os serviços, sempre em ORDER BY id: transações concorrentes do
