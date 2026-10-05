@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Search, Plus, Edit2, Trash2, Eye, ClipboardList, Play, CheckCircle, ArrowRight, Calendar, X, DollarSign, Inbox, Pause, MoreVertical } from 'lucide-react'
 import { Button, Input, Modal, Badge, EmptyState, Select, Textarea } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui'
@@ -96,6 +96,10 @@ function getDateRange(period: string): { startDate?: string; endDate?: string } 
 
 export default function OrdersPage() {
   const [search, setSearch] = useState('')
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('search')
+    if (q) setSearch(q)
+  }, [])
   const [statusFilter, setStatusFilter] = useState('')
   const [periodFilter, setPeriodFilter] = useState('')
   const [customStartDate, setCustomStartDate] = useState('')
