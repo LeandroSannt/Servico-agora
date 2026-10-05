@@ -41,11 +41,14 @@ export default function ClientsPage() {
   const [sellFor, setSellFor] = useState<Client | null>(null)
   const [historyFor, setHistoryFor] = useState<Client | null>(null)
 
-  const balanceLabel = (client: Client) => {
+  const balanceInfo = (client: Client) => {
     const b = client.balances ?? []
     if (b.length === 0) return null
     const shown = b.slice(0, 2).map((x) => `${x.remaining} ${x.serviceName}`).join(', ')
-    return b.length > 2 ? `${shown} +${b.length - 2}` : shown
+    return {
+      label: b.length > 2 ? `${shown} +${b.length - 2}` : shown,
+      title: b.map((x) => `${x.remaining} ${x.serviceName}`).join(', '),
+    }
   }
 
   const { data: clientsData, isLoading: loading } = useClients({ search, limit: 50 })
@@ -80,7 +83,9 @@ export default function ClientsPage() {
   }
 
   // Mobile card view for clients
-  const ClientCard = ({ client }: { client: Client }) => (
+  const ClientCard = ({ client }: { client: Client }) => {
+    const balance = balanceInfo(client)
+    return (
     <div className="bg-white rounded-lg shadow-sm border p-4 space-y-3">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3 min-w-0">
@@ -169,8 +174,8 @@ export default function ClientsPage() {
           {client.city && client.state ? `${client.city}/${client.state}` : '-'}
         </div>
         <div className="flex items-center gap-2">
-          {balanceLabel(client) && (
-            <Badge variant="info" className="text-xs">{balanceLabel(client)}</Badge>
+          {balance && (
+            <Badge variant="info" className="text-xs whitespace-nowrap" title={balance.title}>{balance.label}</Badge>
           )}
           <Badge variant="primary" className="text-xs">
             {client._count?.serviceOrders || 0} OS
@@ -178,7 +183,8 @@ export default function ClientsPage() {
         </div>
       </div>
     </div>
-  )
+    )
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -255,7 +261,9 @@ export default function ClientsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clients.map((client) => (
+                  {clients.map((client) => {
+                    const balance = balanceInfo(client)
+                    return (
                     <TableRow key={client.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -296,8 +304,8 @@ export default function ClientsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {balanceLabel(client) ? (
-                          <Badge variant="info">{balanceLabel(client)}</Badge>
+                        {balance ? (
+                          <Badge variant="info" className="whitespace-nowrap" title={balance.title}>{balance.label}</Badge>
                         ) : (
                           <span className="text-gray-400">—</span>
                         )}
@@ -329,7 +337,8 @@ export default function ClientsPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
