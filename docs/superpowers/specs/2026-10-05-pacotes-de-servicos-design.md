@@ -47,7 +47,7 @@ Nomes de tabela seguem o padrão snake_case com `@@map`, campos com `@map`.
 | price | Decimal(10,2) | > 0 |
 | isActive | Boolean, default true | |
 | storeId | FK Store, cascade | |
-| serviceId | FK Service, `onDelete: NoAction` | Serviço da mesma loja. `NoAction` (não `Restrict`) para a exclusão em cascata de loja/empresa continuar funcionando; a proteção contra apagar o serviço diretamente é a mesma |
+| serviceId | FK Service, `onDelete: Cascade` | Serviço da mesma loja. Cascade para a exclusão de loja/empresa funcionar: no Postgres cada passo da cascata é um comando próprio e uma regra `NoAction` falharia conforme a ordem. A API nunca apaga serviço (só desativa) |
 | createdAt / updatedAt | | |
 
 Relações inversas: `Store.servicePackages`, `Service.packages`.
@@ -58,14 +58,14 @@ Relações inversas: `Store.servicePackages`, `Service.packages`.
 |---|---|---|
 | id | String cuid | |
 | clientId | FK Client, cascade | |
-| packageId | FK ServicePackage, `onDelete: NoAction` | Origem |
-| serviceId | FK Service, `onDelete: NoAction` | Copiado da origem; usado para casar com itens da OS |
+| packageId | FK ServicePackage, `onDelete: Cascade` | Origem. A API só apaga pacote sem vendas (com trava `FOR UPDATE`); com vendas, desativa |
+| serviceId | FK Service, `onDelete: Cascade` | Copiado da origem; usado para casar com itens da OS |
 | name | String | Copiado |
 | quantity | Int | Copiado |
 | price | Decimal(10,2) | Copiado; valor pago |
 | status | enum `ClientPackageStatus` { ACTIVE, CANCELLED } | |
 | notes | String? | Ex.: forma de pagamento |
-| soldById | FK User | Quem vendeu |
+| soldById | FK User opcional, `onDelete: SetNull` | Quem vendeu. Se o usuário for excluído, a venda continua com vendedor vazio |
 | soldAt | DateTime, default now | Data da venda (usada no faturamento) |
 | cancelledAt | DateTime? | |
 | createdAt / updatedAt | | |
@@ -121,7 +121,7 @@ Resposta:
   balances: Array<{ serviceId: string; serviceName: string; remaining: number }>,
   packages: Array<{
     id, name, serviceId, serviceName, quantity, used, remaining, price,
-    status, soldAt, soldBy: { name }, notes,
+    status, soldAt, soldBy: { name } | null, notes,
     usages: Array<{ quantity, createdAt, order: { id, orderNumber, status } }>
   }>
 }
