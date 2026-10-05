@@ -114,11 +114,11 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-gray-500">Loja</p>
-            <p className="font-medium">{pkg.store.name}</p>
+            <p className="font-medium text-gray-900">{pkg.store.name}</p>
           </div>
           <div>
             <p className="text-gray-500">Serviço</p>
-            <p className="font-medium">{pkg.service.name}</p>
+            <p className="font-medium text-gray-900">{pkg.service.name}</p>
           </div>
         </div>
       ) : (

@@ -57,7 +57,7 @@ export default function ClientPackagesModal({ client, canCancel, onClose }: Prop
             <div key={p.id} className={`border rounded-lg p-3 ${cancelled ? 'opacity-60' : ''}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className={`font-medium ${cancelled ? 'line-through' : ''}`}>{p.name}</p>
+                  <p className={`font-medium text-gray-900 ${cancelled ? 'line-through' : ''}`}>{p.name}</p>
                   <p className="text-xs text-gray-500">
                     {formatDate(p.soldAt)} · {formatCurrency(p.price)} · vendido por {p.soldBy?.name ?? '—'}
                   </p>
