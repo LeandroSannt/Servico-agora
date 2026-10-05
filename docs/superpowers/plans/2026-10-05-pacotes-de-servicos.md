@@ -894,6 +894,8 @@ git commit -m "feat(pacotes): helpers de acesso, include da OS e consumo transac
 ### Task 6: API `/api/packages`
 
 **Files:**
+- Create: `src/lib/packages/package-serializer.ts`
+- Create: `src/lib/packages/__tests__/package-serializer.test.ts`
 - Create: `src/app/api/packages/route.ts`
 - Create: `src/app/api/packages/[id]/route.ts`
 
@@ -2738,7 +2740,7 @@ git commit -m "feat(pacotes): usar saldo de pacote na OS e exibir itens cobertos
 - [ ] **Step 1: Suíte completa**
 
 Run: `npm test && npx tsc --noEmit && npm run lint && npm run build`
-Expected: tudo verde. O `build` confirma que nenhum `route.ts` exporta algo além de handlers.
+Expected: tudo verde; Vitest com 20 testes em 4 arquivos. O `build` confirma que nenhum `route.ts` exporta algo além de handlers.
 
 - [ ] **Step 2: Push e PR**
 
