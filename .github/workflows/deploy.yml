@@ -73,7 +73,7 @@ jobs:
       packages: read
     environment:
       name: producao
-      url: http://${{ secrets.VPS_HOST }}
+      url: https://servicoagora.com.br
     steps:
       - uses: actions/checkout@v4
         with:
