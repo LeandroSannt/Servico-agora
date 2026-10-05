@@ -368,9 +368,11 @@ model ServicePackage {
 
   storeId   String  @map("store_id")
   store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  // NoAction (não Restrict) para a exclusão em cascata de loja/empresa funcionar
+  // Cascade: no Postgres cada exclusão em cascata roda como statement próprio, então
+  // NoAction/Restrict quebrariam a exclusão de loja/empresa conforme a ordem da cascata.
+  // A API não apaga serviço (só desativa), então isto só age via loja/empresa.
   serviceId String  @map("service_id")
-  service   Service @relation(fields: [serviceId], references: [id], onDelete: NoAction)
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   sales ClientPackage[]
 
@@ -390,14 +392,17 @@ model ClientPackage {
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
 
+  // Cascade em pacote/serviço pelo mesmo motivo (exclusão de loja/empresa). A API só apaga
+  // um ServicePackage sem vendas (senão desativa) e nunca apaga serviço. Excluir o
+  // vendedor mantém o histórico da venda (SetNull).
   clientId  String         @map("client_id")
   client    Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   packageId String         @map("package_id")
-  package   ServicePackage @relation(fields: [packageId], references: [id], onDelete: NoAction)
+  package   ServicePackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
   serviceId String         @map("service_id")
-  service   Service        @relation(fields: [serviceId], references: [id], onDelete: NoAction)
-  soldById  String         @map("sold_by_id")
-  soldBy    User           @relation("PackageSeller", fields: [soldById], references: [id], onDelete: NoAction)
+  service   Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  soldById  String?        @map("sold_by_id")
+  soldBy    User?          @relation("PackageSeller", fields: [soldById], references: [id], onDelete: SetNull)
 
   usages PackageUsage[]
 

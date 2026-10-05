@@ -82,7 +82,7 @@ export function serializeClientPackage(cp: Row) {
     status: cp.status,
     soldAt: cp.soldAt,
     cancelledAt: cp.cancelledAt,
-    soldBy: { name: cp.soldBy.name },
+    soldBy: cp.soldBy ? { name: cp.soldBy.name } : null,
     notes: cp.notes,
     usages: cp.usages.map((u) => ({
       quantity: u.quantity,

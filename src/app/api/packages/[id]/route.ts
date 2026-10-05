@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { servicePackageUpdateSchema } from '@/lib/validations'
 import { requireAuth, requireRoles } from '@/lib/auth-utils'
@@ -81,20 +80,20 @@ export async function DELETE(_request: NextRequest, { params }: Ctx) {
     const denied = denyIfNoStoreAccess(user!, existing.store, 'excluir pacotes de')
     if (denied) return denied
 
-    if (existing._count.sales === 0) {
-      try {
-        await prisma.servicePackage.delete({ where: { id } })
-        return NextResponse.json({ message: 'Pacote excluído com sucesso' })
-      } catch (deleteError) {
-        // Uma venda pode ter sido registrada entre a contagem e o delete;
-        // a FK (NoAction) barra o delete e caímos para desativar.
-        const isFkViolation =
-          deleteError instanceof Prisma.PrismaClientKnownRequestError && deleteError.code === 'P2003'
-        if (!isFkViolation) throw deleteError
-      }
-    }
+    // A FK das vendas é Cascade: apagar um pacote vendido apagaria as vendas. Trava a linha
+    // do pacote (FOR UPDATE conflita com o FOR KEY SHARE de quem insere uma venda), conta as
+    // vendas já confirmadas e só então apaga; se houver venda, desativa.
+    const outcome = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM service_packages WHERE id = ${id} FOR UPDATE`
+      if (locked.length === 0) return 'missing' as const
+      const { count } = await tx.servicePackage.deleteMany({ where: { id, sales: { none: {} } } })
+      if (count > 0) return 'deleted' as const
+      await tx.servicePackage.update({ where: { id }, data: { isActive: false } })
+      return 'deactivated' as const
+    })
 
-    await prisma.servicePackage.update({ where: { id }, data: { isActive: false } })
+    if (outcome === 'missing') return NextResponse.json({ error: 'Pacote não encontrado' }, { status: 404 })
+    if (outcome === 'deleted') return NextResponse.json({ message: 'Pacote excluído com sucesso' })
     return NextResponse.json({ message: 'Pacote já vendido; foi desativado' })
   } catch (error) {
     console.error('Erro ao excluir pacote:', error)
