@@ -16,7 +16,7 @@ env:
 
 jobs:
   check:
-    name: Tipos e lint
+    name: Tipos, testes e lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
