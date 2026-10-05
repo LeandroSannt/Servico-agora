@@ -1,4 +1,5 @@
-# Producao (VPS): docker compose -f docker-compose.prod.yml up -d --build
+# Producao (VPS). Deploy normal e feito pelo GitHub Actions (deploy/deploy.sh).
+# Build local na VPS, se precisar: docker compose -f docker-compose.prod.yml up -d --build
 # Postgres fica so na rede interna; Caddy expoe 80/443 e faz proxy para o app.
 services:
   postgres:
@@ -18,6 +19,7 @@ services:
       retries: 5
 
   app:
+    image: ghcr.io/leandrosannt/servico-agora:${APP_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
