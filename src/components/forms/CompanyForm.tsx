@@ -41,6 +41,7 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
   const [logoValue, setLogoValue] = useState<string | null | undefined>(undefined)
   const [logoError, setLogoError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
+  const [previewFailed, setPreviewFailed] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
@@ -102,6 +103,7 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
     try {
       const dataUrl = await resizeImageToDataUrl(file, 512)
       setLogoPreview(dataUrl)
+      setPreviewFailed(false)
       setLogoValue(dataUrl)
     } catch (err) {
       setLogoError(err instanceof Error ? err.message : 'Não foi possível processar a imagem')
@@ -262,12 +264,13 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
         <div className="mt-4">
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Logo</label>
           <div className="flex items-center gap-4">
-            {logoPreview ? (
+            {logoPreview && !previewFailed ? (
               // eslint-disable-next-line @next/next/no-img-element -- data URL / rota autenticada: não passam pelo otimizador do Next
               <img
                 src={logoPreview}
                 alt="Logo da empresa"
                 className="w-16 h-16 object-contain bg-white border rounded-lg flex-shrink-0"
+                onError={() => setPreviewFailed(true)}
               />
             ) : (
               <div className="w-16 h-16 bg-gray-100 border rounded-lg flex items-center justify-center flex-shrink-0">
@@ -319,12 +322,13 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
             className="h-12 rounded-lg flex items-center justify-center gap-2 text-white font-semibold"
             style={{ backgroundColor: primaryColor }}
           >
-            {logoPreview && (
+            {logoPreview && !previewFailed && (
               // eslint-disable-next-line @next/next/no-img-element -- data URL / rota autenticada: não passam pelo otimizador do Next
               <img
                 src={logoPreview}
                 alt=""
                 className="w-8 h-8 object-contain bg-white rounded flex-shrink-0"
+                onError={() => setPreviewFailed(true)}
               />
             )}
             <span className="truncate">{watch('name') || 'Nome da Empresa'}</span>

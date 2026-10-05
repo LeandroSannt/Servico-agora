@@ -6,9 +6,14 @@ type Ctx = { params: Promise<{ id: string }> }
 
 // GET /api/companies/[id]/logo — bytes da logo enviada (URL versionada por ?v=)
 export async function GET(_request: NextRequest, { params }: Ctx) {
-  const { error } = await requireAuth()
+  const { user, error } = await requireAuth()
   if (error) return error
   const { id } = await params
+
+  // A logo só pode ser vista por SUPER_ADMIN ou por usuários da própria empresa
+  if (user!.role !== 'SUPER_ADMIN' && user!.companyId !== id) {
+    return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+  }
 
   const company = await prisma.company.findUnique({
     where: { id },
@@ -23,6 +28,8 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
       'Content-Type': company.logoMimeType,
       'Cache-Control': 'private, max-age=31536000, immutable',
       'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'Content-Disposition': 'inline',
     },
   })
 }

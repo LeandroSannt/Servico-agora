@@ -98,8 +98,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
     if (error instanceof Error && error.name === 'ZodError') {
+      const issues = (error as { issues?: { path: (string | number)[]; message: string }[] }).issues
+      const logoIssue = issues?.find((i) => i.path[0] === 'logo')
       return NextResponse.json(
-        { error: 'Dados inválidos', details: error },
+        { error: logoIssue?.message ?? 'Dados inválidos', details: error },
         { status: 400 }
       )
     }
