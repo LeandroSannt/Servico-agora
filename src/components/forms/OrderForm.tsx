@@ -201,6 +201,16 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
   const { data: servicesData } = useServices({ storeId: storeId, limit: 100 })
   const services = servicesData?.data || []
 
+  // Nome com que cada serviço vinculado entrou no formulário (carregado da OS ou escolhido no
+  // catálogo); só serve de referência quando o serviço não está na lista do catálogo (limit 100)
+  const linkedServiceNames = useRef(
+    new Map<string, string>(
+      (order?.services ?? []).flatMap((s): [string, string][] =>
+        s.serviceId ? [[s.serviceId, s.serviceName]] : []
+      )
+    )
+  )
+
   // New client form
   const {
     register: registerClient,
@@ -285,6 +295,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       const service = services.find((s) => s.id === serviceId)
       if (service) {
         setValue(`services.${index}.serviceId`, serviceId)
+        linkedServiceNames.current.set(serviceId, service.name)
         setValue(`services.${index}.serviceName`, service.name)
         setValue(`services.${index}.description`, service.description || '')
         setValue(`services.${index}.price`, Number(service.price))
@@ -547,12 +558,18 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                       placeholder="Ex: Reparo específico"
                       error={errors.services?.[index]?.serviceName?.message}
                       {...register(`services.${index}.serviceName`, {
-                        onChange: () => {
-                          // Nome alterado: deixa de ser o serviço do catálogo, então não usa pacote
-                          if (getValues(`services.${index}.serviceId`)) {
-                            setValue(`services.${index}.serviceId`, '')
-                            setValue(`services.${index}.usePackageQuantity`, 0)
-                          }
+                        onChange: (e) => {
+                          // Só deixa de ser o serviço do catálogo (e de usar pacote) se o nome realmente
+                          // mudou; compara sem espaços nas pontas e sem diferenciar maiúsculas
+                          const linkedId = getValues(`services.${index}.serviceId`)
+                          if (!linkedId) return
+                          const catalogName =
+                            services.find((s) => s.id === linkedId)?.name ??
+                            linkedServiceNames.current.get(linkedId)
+                          const typed = String(e.target.value ?? '').trim().toLowerCase()
+                          if (catalogName !== undefined && typed === catalogName.trim().toLowerCase()) return
+                          setValue(`services.${index}.serviceId`, '')
+                          setValue(`services.${index}.usePackageQuantity`, 0)
                         },
                       })}
                     />
