@@ -143,14 +143,14 @@ Cancela. Regras: pertence ao cliente; `status === 'ACTIVE'`; `usages.length === 
 
 0. Antes da transação, validações baratas: item com `usePackageQuantity > 0` exige `serviceId` (400 "Só serviços cadastrados podem usar pacote") e `usePackageQuantity ≤ quantity` (400 "Quantidade do pacote maior que a do item").
 1. Dentro da transação (PUT já usa `prisma.$transaction`; POST passa a usar). **No PUT, o `deleteMany` dos `orderService` antigos roda primeiro**, o que apaga os `PackageUsage` da própria OS por cascata; assim a leitura de saldo a seguir já não conta o consumo da OS em edição, sem regra especial no servidor. Para cada item com `usePackageQuantity > 0`:
-   - Trava os `ClientPackage` ACTIVE do cliente para aquele `serviceId` com `$queryRaw` (`SELECT id FROM client_packages WHERE ... FOR UPDATE`; Prisma não expõe `FOR UPDATE`), depois lê pacotes e consumos e calcula o saldo, ordenando por `soldAt asc`.
+   - Trava os `ClientPackage` ACTIVE do cliente para aquele `serviceId` com `$queryRaw` (`SELECT id FROM client_packages WHERE client_id = $1 AND service_id = $2 AND status = 'ACTIVE' FOR UPDATE`; Prisma não expõe `FOR UPDATE`), depois lê pacotes e consumos e calcula o saldo, ordenando por `soldAt asc`. O bloqueio serializa só salvamentos concorrentes do mesmo cliente e serviço, que é o caso que importa; OS de outros serviços ou uma venda simultânea não são bloqueadas e não precisam ser.
    - Se `usePackageQuantity > saldo` lança `InsufficientBalanceError { serviceId, remaining }` (classe em `src/lib/packages/errors.ts`). A rota captura fora da transação e responde 409 `{ error: 'Saldo do pacote insuficiente', serviceId, remaining }`. Sem isso o erro cairia no `catch` genérico como 500.
    - Grava o item coberto: `quantity = usePackageQuantity`, `price = 0`, `serviceName` e `description` normais, `saveGlobally = false`. Distribui o consumo pelos pacotes mais antigos primeiro (FIFO), criando um `PackageUsage` por pacote tocado. Como `orderServiceId` é único, se o consumo precisar tocar dois pacotes, grava um item coberto por pacote (ex.: 2 do pacote A e 1 do pacote B viram dois itens a R$ 0).
    - Se `quantity − usePackageQuantity > 0`, grava o item cobrado com o restante ao `price` enviado.
 2. `totalAmount` soma só os itens cobrados (os cobertos têm preço 0, então a soma atual já está correta).
 3. Resposta de criação/edição inclui os itens com `packageUsage`.
 
-`GET /api/orders` (lista) e `GET /api/orders/[id]` passam a incluir `services.packageUsage { quantity, clientPackage { id, name } }`. A lista é o que alimenta a tela de OS e o formulário de edição, então o include é obrigatório nas duas rotas. `OrderService.serviceId` já vem no payload (`services: true`).
+`GET /api/orders` (lista) e `GET /api/orders/[id]` passam a incluir `services.packageUsage { quantity, clientPackage { id, name } }` com `orderBy: { createdAt: 'asc' }` no include (hoje `services: true` não ordena, e o reagrupamento no formulário depende da ordem). A lista é o que alimenta a tela de OS e o formulário de edição, então o include é obrigatório nas duas rotas. `OrderService.serviceId` já vem no payload.
 
 ### `GET /api/dashboard/stats`
 
@@ -227,7 +227,7 @@ Itens com `packageUsage` exibem o nome com sufixo " (pacote)" e preço R$ 0,00. 
 
 O projeto não tem testes automatizados. Esta entrega adiciona **Vitest** (`npm test`) com testes unitários da lógica de negócio, isolados do banco por meio de funções puras em `src/lib/packages/`:
 
-- `balance.ts`: `computeBalance(packages, usages)` e `availableForOrder(..., editingOrderId)`.
+- `balance.ts`: `computeBalance(packages, usages)` e `availableForOrder(..., editingOrderId)`. A segunda é usada só pelo OrderForm (no servidor o `deleteMany` já resolve); continua pura e testada.
 - `split.ts`: `splitOrderItem(item, available)` → itens coberto(s)/cobrado, incluindo o caso de dois pacotes (FIFO) e `usePackageQuantity = 0`.
 - `allocate.ts`: `allocateFifo(packages, qty)` → distribuição por pacote; erro quando excede.
 
