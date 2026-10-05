@@ -77,7 +77,16 @@ export default function CompaniesPage() {
             className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold flex-shrink-0"
             style={{ backgroundColor: company.primaryColor || '#3B82F6' }}
           >
-            {company.name.charAt(0)}
+            {company.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- rota autenticada da logo: não passa pelo otimizador do Next
+              <img
+                src={company.logoUrl}
+                alt={company.name}
+                className="w-10 h-10 rounded-lg object-contain bg-white"
+              />
+            ) : (
+              company.name.charAt(0)
+            )}
           </div>
           <div className="min-w-0">
             <p className="font-medium text-gray-900 truncate">{company.name}</p>
@@ -227,7 +236,16 @@ export default function CompaniesPage() {
                             className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold"
                             style={{ backgroundColor: company.primaryColor || '#3B82F6' }}
                           >
-                            {company.name.charAt(0)}
+                            {company.logoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- rota autenticada da logo: não passa pelo otimizador do Next
+                              <img
+                                src={company.logoUrl}
+                                alt={company.name}
+                                className="w-10 h-10 rounded-lg object-contain bg-white"
+                              />
+                            ) : (
+                              company.name.charAt(0)
+                            )}
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">{company.name}</p>

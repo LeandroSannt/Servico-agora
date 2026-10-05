@@ -5,7 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Button, Input } from '@/components/ui'
 import { companySchema, type CompanyFormData } from '@/lib/validations'
 import { useCreateCompany, useUpdateCompany } from '@/hooks/api'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Image as ImageIcon } from 'lucide-react'
+import { ACCEPTED_LOGO_TYPES, MAX_SOURCE_BYTES, resizeImageToDataUrl } from '@/lib/image-resize'
 
 interface CompanyFormProps {
   company?: {
@@ -33,6 +35,13 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
   const updateMutation = useUpdateCompany()
 
   const isLoading = createMutation.isPending || updateMutation.isPending
+
+  // Logo: logoValue undefined = sem alteração; null = remover; string = novo data URL
+  const [logoPreview, setLogoPreview] = useState<string | null>(company?.logoUrl ?? null)
+  const [logoValue, setLogoValue] = useState<string | null | undefined>(undefined)
+  const [logoError, setLogoError] = useState<string | null>(null)
+  const [processing, setProcessing] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
     register,
@@ -74,7 +83,44 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
     }
   }, [createMutation.error, updateMutation.error, setError])
 
-  const onSubmit = async (data: CompanyFormData) => {
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite escolher o mesmo arquivo novamente
+    if (!file) return
+
+    setLogoError(null)
+    if (!ACCEPTED_LOGO_TYPES.includes(file.type)) {
+      setLogoError('Use PNG, JPG ou WebP')
+      return
+    }
+    if (file.size > MAX_SOURCE_BYTES) {
+      setLogoError('Arquivo muito grande (máx. 5 MB)')
+      return
+    }
+
+    setProcessing(true)
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 512)
+      setLogoPreview(dataUrl)
+      setLogoValue(dataUrl)
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : 'Não foi possível processar a imagem')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const handleLogoRemove = () => {
+    setLogoPreview(null)
+    setLogoValue(null)
+    setLogoError(null)
+  }
+
+  const onSubmit = async (formData: CompanyFormData) => {
+    const data: CompanyFormData = {
+      ...formData,
+      ...(logoValue !== undefined ? { logo: logoValue } : {}),
+    }
     try {
       if (company) {
         await updateMutation.mutateAsync({ id: company.id, data })
@@ -212,14 +258,76 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
           </div>
         </div>
 
+        {/* Logo */}
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Logo</label>
+          <div className="flex items-center gap-4">
+            {logoPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data URL / rota autenticada: não passam pelo otimizador do Next
+              <img
+                src={logoPreview}
+                alt="Logo da empresa"
+                className="w-16 h-16 object-contain bg-white border rounded-lg flex-shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 bg-gray-100 border rounded-lg flex items-center justify-center flex-shrink-0">
+                <ImageIcon className="w-6 h-6 text-gray-400" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={handleLogoChange}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={processing || isLoading}
+                >
+                  {processing ? 'Processando...' : 'Enviar imagem'}
+                </Button>
+                {logoPreview && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLogoRemove}
+                    disabled={processing || isLoading}
+                  >
+                    Remover
+                  </Button>
+                )}
+              </div>
+              <p className="mt-1.5 text-xs text-gray-500">
+                PNG, JPG ou WebP. A imagem é reduzida para até 512 px.
+              </p>
+              {logoError && <p className="mt-1 text-xs text-red-600">{logoError}</p>}
+            </div>
+          </div>
+        </div>
+
         {/* Preview */}
         <div className="mt-4 p-4 bg-gray-50 rounded-lg">
           <p className="text-sm text-gray-500 mb-2">Preview</p>
           <div
-            className="h-12 rounded-lg flex items-center justify-center text-white font-semibold"
+            className="h-12 rounded-lg flex items-center justify-center gap-2 text-white font-semibold"
             style={{ backgroundColor: primaryColor }}
           >
-            {watch('name') || 'Nome da Empresa'}
+            {logoPreview && (
+              // eslint-disable-next-line @next/next/no-img-element -- data URL / rota autenticada: não passam pelo otimizador do Next
+              <img
+                src={logoPreview}
+                alt=""
+                className="w-8 h-8 object-contain bg-white rounded flex-shrink-0"
+              />
+            )}
+            <span className="truncate">{watch('name') || 'Nome da Empresa'}</span>
           </div>
         </div>
       </div>
@@ -264,7 +372,7 @@ export default function CompanyForm({ company, onSuccess, onCancel }: CompanyFor
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading} className="w-full sm:w-auto">
           Cancelar
         </Button>
-        <Button type="submit" isLoading={isLoading} className="w-full sm:w-auto">
+        <Button type="submit" isLoading={isLoading} disabled={processing} className="w-full sm:w-auto">
           {company ? 'Salvar Alterações' : 'Criar Empresa'}
         </Button>
       </div>
