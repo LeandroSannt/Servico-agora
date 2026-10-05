@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import {
@@ -39,10 +38,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [openMenus, setOpenMenus] = useState<string[]>(['Administração'])
+  const [logoFailed, setLogoFailed] = useState(false)
 
   const user = session?.user
   const userRole = user?.role || ''
   const company = user?.company
+
+  // Nova logo (URL com outro ?v=) merece uma nova tentativa
+  useEffect(() => {
+    setLogoFailed(false)
+  }, [company?.logoUrl])
 
   // Fechar sidebar ao mudar de página (mobile)
   useEffect(() => {
@@ -238,13 +243,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </button>
 
           <div className="flex items-center gap-3 pr-8 lg:pr-0">
-            {company?.logoUrl ? (
-              <Image
+            {company?.logoUrl && !logoFailed ? (
+              // eslint-disable-next-line @next/next/no-img-element -- o otimizador do Next buscaria a rota autenticada da logo sem os cookies do usuário
+              <img
                 src={company.logoUrl}
                 alt={company.name}
                 width={40}
                 height={40}
-                className="rounded-lg object-contain bg-white"
+                className="w-10 h-10 rounded-lg object-contain bg-white"
+                onError={() => setLogoFailed(true)}
               />
             ) : (
               <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">

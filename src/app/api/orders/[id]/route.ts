@@ -4,6 +4,7 @@ import { updateOrderStatusSchema, serviceOrderSchema } from '@/lib/validations'
 import { sendOrderFinishedEmail } from '@/lib/email/send-email'
 import { sendOrderStatusWhatsApp, sendOrderPaidWhatsApp } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/auth-utils'
+import { companyLogoUrl } from '@/lib/company-logo'
 import { createOrderItemsWithPackages, computeOrderTotal } from '@/lib/packages/consume'
 import { orderServicesInclude, displayServiceName } from '@/lib/packages/order-include'
 import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS } from '@/lib/packages/order-request'
@@ -26,7 +27,7 @@ export async function GET(
         store: {
           include: {
             company: {
-              select: { id: true, name: true, primaryColor: true, logoUrl: true },
+              select: { id: true, name: true, primaryColor: true, logoUrl: true, logoMimeType: true, logoUpdatedAt: true },
             },
           },
         },
@@ -44,7 +45,19 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(order)
+    const { company } = order.store
+    return NextResponse.json({
+      ...order,
+      store: {
+        ...order.store,
+        company: {
+          id: company.id,
+          name: company.name,
+          primaryColor: company.primaryColor,
+          logoUrl: companyLogoUrl(company),
+        },
+      },
+    })
   } catch (error) {
     console.error('Erro ao buscar ordem:', error)
     return NextResponse.json(

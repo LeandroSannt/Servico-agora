@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { companySchema } from '@/lib/validations'
+import { requireRoles } from '@/lib/auth-utils'
+import { InvalidLogoError } from '@/lib/company-logo'
+import { logoUpdateData, toPublicCompany } from '@/lib/company-logo-data'
 
 // GET /api/companies/[id] - Buscar empresa por ID
 export async function GET(
@@ -8,6 +11,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { error: authError } = await requireRoles(['SUPER_ADMIN'])
+    if (authError) return authError
+
     const { id } = await params
 
     const company = await prisma.company.findUnique({
@@ -36,7 +42,7 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(company)
+    return NextResponse.json(toPublicCompany(company))
   } catch (error) {
     console.error('Erro ao buscar empresa:', error)
     return NextResponse.json(
@@ -52,9 +58,12 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { error: authError } = await requireRoles(['SUPER_ADMIN'])
+    if (authError) return authError
+
     const { id } = await params
     const body = await request.json()
-    const validatedData = companySchema.partial().parse(body)
+    const { logo, ...validatedData } = companySchema.partial().parse(body)
 
     const existingCompany = await prisma.company.findUnique({
       where: { id },
@@ -93,12 +102,23 @@ export async function PUT(
 
     const company = await prisma.company.update({
       where: { id },
-      data: validatedData,
+      data: { ...validatedData, ...logoUpdateData(logo) },
     })
 
-    return NextResponse.json(company)
+    return NextResponse.json(toPublicCompany(company))
   } catch (error) {
     console.error('Erro ao atualizar empresa:', error)
+    if (error instanceof InvalidLogoError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    if (error instanceof Error && error.name === 'ZodError') {
+      const issues = (error as { issues?: { path: (string | number)[]; message: string }[] }).issues
+      const logoIssue = issues?.find((i) => i.path[0] === 'logo')
+      return NextResponse.json(
+        { error: logoIssue?.message ?? 'Dados inválidos', details: error },
+        { status: 400 }
+      )
+    }
     return NextResponse.json(
       { error: 'Erro ao atualizar empresa' },
       { status: 500 }
@@ -112,6 +132,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { error: authError } = await requireRoles(['SUPER_ADMIN'])
+    if (authError) return authError
+
     const { id } = await params
 
     const existingCompany = await prisma.company.findUnique({

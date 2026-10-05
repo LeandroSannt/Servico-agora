@@ -30,6 +30,23 @@ interface Company {
   }
 }
 
+// Logo da empresa na lista; se a imagem falhar, volta para a inicial
+function CompanyLogo({ company }: { company: Company }) {
+  const [failed, setFailed] = useState(false)
+  if (company.logoUrl && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- rota autenticada da logo: não passa pelo otimizador do Next
+      <img
+        src={company.logoUrl}
+        alt=""
+        className="w-10 h-10 rounded-lg object-contain bg-white"
+        onError={() => setFailed(true)}
+      />
+    )
+  }
+  return <>{company.name.charAt(0)}</>
+}
+
 export default function CompaniesPage() {
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -77,7 +94,7 @@ export default function CompaniesPage() {
             className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold flex-shrink-0"
             style={{ backgroundColor: company.primaryColor || '#3B82F6' }}
           >
-            {company.name.charAt(0)}
+            <CompanyLogo company={company} />
           </div>
           <div className="min-w-0">
             <p className="font-medium text-gray-900 truncate">{company.name}</p>
@@ -227,7 +244,7 @@ export default function CompaniesPage() {
                             className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold"
                             style={{ backgroundColor: company.primaryColor || '#3B82F6' }}
                           >
-                            {company.name.charAt(0)}
+                            <CompanyLogo company={company} />
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">{company.name}</p>

@@ -19,7 +19,7 @@ export const companySchema = z.object({
   zipCode: z.string().optional(),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Cor inválida'),
   secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Cor inválida'),
-  logoUrl: z.string().url('URL inválida').optional().or(z.literal('')),
+  logo: z.string().max(450_000, 'Imagem muito grande').nullable().optional(),
   isActive: z.boolean().optional(),
 })
 
