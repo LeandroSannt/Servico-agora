@@ -52,9 +52,13 @@ export async function listClientPackages(clientId: string) {
   const packages = await prisma.clientPackage.findMany({
     where: { clientId },
     include: clientPackageInclude,
-    orderBy: { soldAt: 'desc' },
+    orderBy: [{ soldAt: 'desc' }, { id: 'desc' }],
   })
-  const balances = (await getBalancesByClient([clientId])).get(clientId) ?? []
+  // Saldo derivado das mesmas linhas lidas acima, para bater com os números por pacote
+  const active = packages
+    .filter((p) => p.status === 'ACTIVE')
+    .sort((a, b) => a.soldAt.getTime() - b.soldAt.getTime() || a.id.localeCompare(b.id))
+  const balances = aggregateServiceBalances(active)
   return { balances, packages: packages.map(serializeClientPackage) }
 }
 
