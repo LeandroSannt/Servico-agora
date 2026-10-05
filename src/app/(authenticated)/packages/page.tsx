@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { Search, Plus, Edit2, Trash2, Package, MoreVertical } from 'lucide-react'
-import { Button, Input, Modal, Badge, EmptyState } from '@/components/ui'
+import { Button, Input, Select, Modal, Badge, EmptyState } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui'
 import PackageForm from '@/components/forms/PackageForm'
-import { usePackages, useDeletePackage, type ServicePackage } from '@/hooks/api'
+import { usePackages, useDeletePackage, useStores, type ServicePackage } from '@/hooks/api'
 import { formatCurrency } from '@/lib/utils'
 
 export default function PackagesPage() {
@@ -15,7 +16,15 @@ export default function PackagesPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [openActionsId, setOpenActionsId] = useState<string | null>(null)
 
-  const { data, isLoading } = usePackages({ search })
+  const { data: session } = useSession()
+  const userStore = session?.user?.store
+  const canManage = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'].includes(session?.user?.role || '')
+  const [storeFilter, setStoreFilter] = useState('')
+
+  const { data: storesData } = useStores({ limit: 100 })
+  const stores = storesData?.data || []
+
+  const { data, isLoading } = usePackages({ search, storeId: storeFilter || undefined })
   const deleteMutation = useDeletePackage()
 
   const packages = data?.data || []
@@ -77,9 +86,11 @@ export default function PackagesPage() {
             <p className="text-sm text-green-600 font-medium mt-0.5">Economia de {pkg.savingsPercent}%</p>
           )}
         </div>
+        {canManage && (
         <div className="relative ml-2">
           <button
             onClick={() => setOpenActionsId(openActionsId === pkg.id ? null : pkg.id)}
+            aria-label={`Ações de ${pkg.name}`}
             className="p-2 hover:bg-gray-100 rounded-lg"
           >
             <MoreVertical className="h-5 w-5 text-gray-500" />
@@ -112,6 +123,7 @@ export default function PackagesPage() {
             </>
           )}
         </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between pt-2 border-t">
@@ -146,10 +158,22 @@ export default function PackagesPage() {
             className="pl-10"
           />
         </div>
-        <Button onClick={handleCreate} className="w-full sm:w-auto justify-center">
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Pacote
-        </Button>
+        {!userStore && (
+          <div className="w-full sm:w-56">
+            <Select
+              aria-label="Filtrar por loja"
+              value={storeFilter}
+              onChange={(e) => setStoreFilter(e.target.value)}
+              options={[{ value: '', label: 'Todas as lojas' }, ...stores.map((st) => ({ value: st.id, label: st.name }))]}
+            />
+          </div>
+        )}
+        {canManage && (
+          <Button onClick={handleCreate} className="w-full sm:w-auto justify-center">
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Pacote
+          </Button>
+        )}
       </div>
 
       {/* Content */}
@@ -161,12 +185,16 @@ export default function PackagesPage() {
         <EmptyState
           icon={<Package className="h-10 w-10 sm:h-12 sm:w-12" />}
           title="Nenhum pacote encontrado"
-          description="Cadastre um pacote para vender a seus clientes"
+          description={
+            canManage ? 'Cadastre um pacote para vender a seus clientes' : 'Nenhum pacote disponível nesta loja'
+          }
           action={
-            <Button onClick={handleCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Pacote
-            </Button>
+            canManage ? (
+              <Button onClick={handleCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Pacote
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -191,7 +219,7 @@ export default function PackagesPage() {
                   <TableHead>Economia</TableHead>
                   <TableHead>Vendas</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  {canManage && <TableHead className="text-right">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -219,25 +247,29 @@ export default function PackagesPage() {
                         {pkg.isActive ? 'Ativo' : 'Inativo'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(pkg)}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteConfirm(pkg.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {canManage && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(pkg)}
+                            aria-label={`Editar ${pkg.name}`}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteConfirm(pkg.id)}
+                            aria-label={`Excluir ${pkg.name}`}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -267,7 +299,8 @@ export default function PackagesPage() {
       >
         <div className="space-y-4">
           <p className="text-sm sm:text-base text-gray-600">
-            Se o pacote já foi vendido, ele será apenas desativado e os saldos dos clientes continuam válidos.
+            Excluir o pacote &quot;{packages.find((p) => p.id === deleteConfirm)?.name}&quot;? Se ele já foi vendido, será
+            apenas desativado e os saldos dos clientes continuam válidos.
           </p>
           <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
             <Button variant="outline" onClick={() => setDeleteConfirm(null)} className="w-full sm:w-auto">
@@ -276,6 +309,7 @@ export default function PackagesPage() {
             <Button
               variant="danger"
               onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
+              isLoading={deleteMutation.isPending}
               className="w-full sm:w-auto"
             >
               Excluir

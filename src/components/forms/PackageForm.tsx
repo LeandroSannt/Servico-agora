@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { useSession } from 'next-auth/react'
+import { Store } from 'lucide-react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button, Input, Textarea, Select } from '@/components/ui'
 import { servicePackageSchema, type ServicePackageFormData } from '@/lib/validations'
@@ -19,6 +21,9 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
   const updateMutation = useUpdatePackage()
   const isLoading = createMutation.isPending || updateMutation.isPending
   const [nameTouched, setNameTouched] = useState(!!pkg)
+  const { data: session } = useSession()
+  const userStore = session?.user?.store
+  const initialStoreId = pkg?.store.id || userStore?.id || ''
 
   const { data: storesData } = useStores({ limit: 100 })
   const stores = storesData?.data || []
@@ -29,12 +34,12 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
     watch,
     setValue,
     setError,
-    formState: { errors },
+    formState: { errors, isSubmitted },
   } = useForm<ServicePackageFormData>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(servicePackageSchema) as any,
     defaultValues: {
-      storeId: pkg?.store.id || '',
+      storeId: initialStoreId,
       serviceId: pkg?.service.id || '',
       name: pkg?.name || '',
       description: pkg?.description || '',
@@ -52,13 +57,13 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
   const { data: servicesData } = useServices({ storeId, limit: 100 })
   const services = (servicesData?.data || []).filter((s) => s.isActive || s.id === serviceId)
   const service = services.find((s) => s.id === serviceId)
-  const servicePrice = Number(service?.price || 0)
+  const servicePrice = Number(service?.price ?? pkg?.service.price ?? 0)
 
   // Nome sugerido "10× Limpeza" enquanto o usuário não editar o nome
   useEffect(() => {
     if (nameTouched || !service || quantity < 1) return
-    setValue('name', `${quantity}× ${service.name}`)
-  }, [nameTouched, service, quantity, setValue])
+    setValue('name', `${quantity}× ${service.name}`, { shouldValidate: isSubmitted })
+  }, [nameTouched, service, quantity, setValue, isSubmitted])
 
   useEffect(() => {
     const error = createMutation.error || updateMutation.error
@@ -118,14 +123,30 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {userStore ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Loja</label>
+              <div className="flex items-center gap-2 h-10 px-3 bg-gray-100 border border-gray-300 rounded-lg">
+                <Store className="w-4 h-4 text-gray-500" />
+                <span className="text-sm text-gray-900">{userStore.name}</span>
+              </div>
+              <input type="hidden" value={initialStoreId} {...register('storeId')} />
+              {errors.storeId?.message && (
+                <p className="mt-1.5 text-xs text-red-600">{errors.storeId.message}</p>
+              )}
+            </div>
+          ) : (
+            <Select
+              id="pkg-store"
+              label="Loja"
+              options={stores.map((s) => ({ value: s.id, label: s.name }))}
+              placeholder="Selecione a loja"
+              error={errors.storeId?.message}
+              {...register('storeId', { onChange: () => setValue('serviceId', '') })}
+            />
+          )}
           <Select
-            label="Loja"
-            options={stores.map((s) => ({ value: s.id, label: s.name }))}
-            placeholder="Selecione a loja"
-            error={errors.storeId?.message}
-            {...register('storeId', { onChange: () => setValue('serviceId', '') })}
-          />
-          <Select
+            id="pkg-service"
             label="Serviço"
             options={services.map((s) => ({ value: s.id, label: `${s.name} — ${formatCurrency(Number(s.price))}` }))}
             placeholder={storeId ? 'Selecione o serviço' : 'Selecione a loja primeiro'}
@@ -138,6 +159,7 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
+          id="pkg-quantity"
           label="Quantidade de unidades"
           type="number"
           min="2"
@@ -145,6 +167,7 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
           {...register('quantity', { valueAsNumber: true })}
         />
         <Input
+          id="pkg-price"
           label="Preço do pacote (R$)"
           placeholder="R$ 0,00"
           mask="currency"
@@ -160,8 +183,10 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
           {servicePrice > 0 && (
             <>
               {' · '}
-              {savings >= 0 ? (
+              {savings > 0 ? (
                 <span className="text-green-600">economia de {savings}% em relação ao avulso ({formatCurrency(servicePrice)})</span>
+              ) : savings === 0 ? (
+                <span className="text-gray-600">mesmo preço do avulso ({formatCurrency(servicePrice)})</span>
               ) : (
                 <span className="text-amber-600">mais caro que o avulso ({formatCurrency(servicePrice)})</span>
               )}
@@ -171,13 +196,14 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
       )}
 
       <Input
+        id="pkg-name"
         label="Nome do pacote"
         placeholder="Ex: 10× Limpeza"
         error={errors.name?.message}
         {...register('name', { onChange: () => setNameTouched(true) })}
       />
 
-      <Textarea label="Descrição" placeholder="Opcional" {...register('description')} />
+      <Textarea id="pkg-description" label="Descrição" placeholder="Opcional" {...register('description')} />
 
       {pkg && (
         <div className="flex items-center gap-2">

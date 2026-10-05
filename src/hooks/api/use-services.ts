@@ -80,6 +80,7 @@ export function useUpdateService() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['services'] })
       queryClient.invalidateQueries({ queryKey: ['service', variables.id] })
+      queryClient.invalidateQueries({ queryKey: ['packages'] })
     },
   })
 }
@@ -94,6 +95,7 @@ export function useDeleteService() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] })
+      queryClient.invalidateQueries({ queryKey: ['packages'] })
     },
   })
 }
