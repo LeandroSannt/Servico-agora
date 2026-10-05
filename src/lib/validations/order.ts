@@ -8,6 +8,8 @@ export const orderServiceSchema = z.object({
   quantity: z.coerce.number().min(1, 'Quantidade deve ser pelo menos 1'),
   saveGlobally: z.boolean().optional(),
   isExisting: z.boolean().optional(), // Serviço já existe na OS (não deve ser salvo globalmente)
+  // Unidades deste item que saem do saldo de pacote do cliente (o servidor zera o preço)
+  usePackageQuantity: z.coerce.number().int().min(0).optional(),
 })
 
 export const serviceOrderSchema = z.object({
