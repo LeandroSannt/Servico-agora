@@ -23,7 +23,8 @@ export interface OrderPaidMessageData {
   storeName: string
   companyName: string
   companyId: string
-  services: { name: string; price: number; quantity: number; description?: string | null }[]
+  services: { name: string; price: number; quantity: number; description?: string | null; equipments?: string[] }[]
+  products?: { name: string; quantity: number; unitPrice: number }[]
   totalAmount: number
   description?: string | null
   createdAt: Date | string

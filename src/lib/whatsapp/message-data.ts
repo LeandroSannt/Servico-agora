@@ -51,10 +51,12 @@ export function buildVariables(data: OrderStatusMessageData | OrderPaidMessageDa
     orderNumber: data.orderNumber,
     storeName: data.storeName,
     companyName: data.companyName,
-    servicesMultiline: data.services
-      .map((s) => `  • ${s.name} (${s.quantity}x) - R$ ${(s.price * s.quantity).toFixed(2)}`)
-      .join('\n'),
-    services: data.services.map((s) => `${s.name} (${s.quantity}x) R$ ${brl(s.price * s.quantity)}`).join('; '),
+    // OS só com produtos: a Meta rejeita parâmetro vazio
+    servicesMultiline:
+      data.services
+        .map((s) => `  • ${s.name} (${s.quantity}x) - R$ ${(s.price * s.quantity).toFixed(2)}`)
+        .join('\n') || '—',
+    services: data.services.map((s) => `${s.name} (${s.quantity}x) R$ ${brl(s.price * s.quantity)}`).join('; ') || '—',
     totalAmountFixed: data.totalAmount.toFixed(2),
     totalAmount: brl(data.totalAmount),
     pausedReasonBlock: pausedReason ? `\n📝 *Motivo:* ${pausedReason}\n` : '',

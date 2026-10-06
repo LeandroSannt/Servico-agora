@@ -37,7 +37,7 @@ export async function sendOrderFinishedEmail(data: OrderFinishedEmailData) {
       </div>
     `
     )
-    .join('')
+    .join('') || '<div style="color: #6b7280; font-size: 14px; padding: 12px;">—</div>'
 
   const html = `
     <!DOCTYPE html>
