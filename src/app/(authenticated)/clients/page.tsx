@@ -2,13 +2,14 @@
 
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { Plus, Search, Users, Edit, Trash2, Phone, Mail, MoreVertical, Package, History } from 'lucide-react'
+import { Plus, Search, Users, Edit, Trash2, Phone, Mail, MoreVertical, Package, History, Wrench } from 'lucide-react'
 import { Button, Input, Badge, EmptyState, Modal } from '@/components/ui'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import ClientForm from '@/components/forms/ClientForm'
 import SellPackageModal from '@/components/packages/SellPackageModal'
 import ClientPackagesModal from '@/components/packages/ClientPackagesModal'
+import ClientEquipmentsModal from '@/components/equipments/ClientEquipmentsModal'
 import { useClients, useDeleteClient } from '@/hooks/api'
 import { formatPhone, formatDocument } from '@/lib/utils'
 
@@ -40,6 +41,7 @@ export default function ClientsPage() {
   const canSell = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'].includes(session?.user?.role ?? '')
   const [sellFor, setSellFor] = useState<Client | null>(null)
   const [historyFor, setHistoryFor] = useState<Client | null>(null)
+  const [equipmentsFor, setEquipmentsFor] = useState<Client | null>(null)
 
   const balanceInfo = (client: Client) => {
     const b = client.balances ?? []
@@ -112,6 +114,16 @@ export default function ClientsPage() {
                 onClick={() => setOpenActionsId(null)}
               />
               <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border py-1 z-20 min-w-[120px]">
+                <button
+                  onClick={() => {
+                    setEquipmentsFor(client)
+                    setOpenActionsId(null)
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <Wrench className="h-4 w-4" />
+                  Equipamentos
+                </button>
                 <button
                   onClick={() => {
                     setHistoryFor(client)
@@ -313,6 +325,9 @@ export default function ClientsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="icon" title="Equipamentos" aria-label={`Equipamentos de ${client.name}`} onClick={() => setEquipmentsFor(client)}>
+                            <Wrench className="w-4 h-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" title="Pacotes" aria-label={`Pacotes de ${client.name}`} onClick={() => setHistoryFor(client)}>
                             <History className="w-4 h-4" />
                           </Button>
@@ -394,6 +409,7 @@ export default function ClientsPage() {
 
       <SellPackageModal client={sellFor} onClose={() => setSellFor(null)} />
       <ClientPackagesModal client={historyFor} canCancel={canSell} onClose={() => setHistoryFor(null)} />
+      <ClientEquipmentsModal client={equipmentsFor} onClose={() => setEquipmentsFor(null)} />
     </div>
   )
 }
