@@ -78,3 +78,37 @@ describe('displayServiceName', () => {
     expect(displayServiceName({ serviceName: 'Limpeza', packageUsage: null })).toBe('Limpeza')
   })
 })
+
+describe('createOrderItemsWithPackages: equipamentos', () => {
+  it('cada registro da divisão (coberto + cobrado) recebe os mesmos equipamentos', async () => {
+    const created: Record<string, unknown>[] = []
+    const tx = {
+      $queryRaw: async () => [{ id: 'p1' }],
+      clientPackage: {
+        findMany: async () => [{ id: 'p1', serviceId: 'svc', quantity: 5, soldAt: new Date('2026-01-01'), usages: [] }],
+      },
+      orderService: {
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          created.push(data)
+          return { id: `os${created.length}` }
+        },
+      },
+      packageUsage: { create: async () => ({}) },
+    } as unknown as Prisma.TransactionClient
+
+    await createOrderItemsWithPackages(tx, {
+      orderId: 'o',
+      clientId: 'c',
+      items: [
+        { serviceId: 'svc', serviceName: 'Limpeza', price: 30, quantity: 3, usePackageQuantity: 2, equipmentIds: ['e1', 'e2'] },
+        { serviceName: 'Avulso', price: 10, quantity: 1 },
+      ],
+    })
+
+    expect(created).toHaveLength(3)
+    const links = { create: [{ equipmentId: 'e1' }, { equipmentId: 'e2' }] }
+    expect(created[0].equipments).toEqual(links) // coberto
+    expect(created[1].equipments).toEqual(links) // cobrado
+    expect(created[2].equipments).toBeUndefined() // sem equipamento
+  })
+})

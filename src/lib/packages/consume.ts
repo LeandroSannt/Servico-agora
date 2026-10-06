@@ -74,6 +74,10 @@ export async function createOrderItemsWithPackages(tx: Prisma.TransactionClient,
       balancesByService.set(serviceId, result.balances)
     }
 
+    const equipmentLinks = item.equipmentIds?.length
+      ? { create: item.equipmentIds.map((equipmentId) => ({ equipmentId })) }
+      : undefined
+
     for (const part of splitOrderItem(item, allocations)) {
       const created = await tx.orderService.create({
         data: {
@@ -84,6 +88,7 @@ export async function createOrderItemsWithPackages(tx: Prisma.TransactionClient,
           price: part.price,
           quantity: part.quantity,
           saveGlobally: part.saveGlobally,
+          equipments: equipmentLinks,
         },
       })
       if (part.allocation) {

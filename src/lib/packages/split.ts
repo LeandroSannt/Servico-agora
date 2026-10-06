@@ -8,6 +8,8 @@ export interface OrderItemInput {
   quantity: number
   saveGlobally?: boolean
   usePackageQuantity?: number
+  /** Equipamentos do cliente desta linha; copiados para cada registro gerado pela divisão. */
+  equipmentIds?: string[]
 }
 
 export interface SplitItem {
