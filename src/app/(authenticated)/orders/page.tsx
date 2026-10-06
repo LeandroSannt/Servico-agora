@@ -452,7 +452,6 @@ export default function OrdersPage() {
                   <TableHead>Número</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Equipamentos</TableHead>
-                  <TableHead>Loja</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Data</TableHead>
@@ -487,7 +486,6 @@ export default function OrdersPage() {
                           )
                         })()}
                       </TableCell>
-                      <TableCell>{order.store.name}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <button
