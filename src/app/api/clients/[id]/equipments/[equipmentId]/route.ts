@@ -21,7 +21,10 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     // Só o equipamento deste cliente (updateMany com clientId evita editar o de outro cliente)
     const { count } = await prisma.equipment.updateMany({ where: { id: equipmentId, clientId: id }, data: parsed.data })
     if (count === 0) return notFound()
-    return NextResponse.json(await prisma.equipment.findUnique({ where: { id: equipmentId } }))
+    // Pode ter sido apagado entre o updateMany e a releitura
+    const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId } })
+    if (!equipment) return notFound()
+    return NextResponse.json(equipment)
   } catch (error) {
     console.error('Erro ao editar equipamento:', error)
     return NextResponse.json({ error: 'Erro ao editar equipamento' }, { status: 500 })
