@@ -12,6 +12,7 @@ export const equipmentSchema = z.object({
   brand: optionalText,
   model: optionalText,
   serialNumber: optionalText,
+  color: optionalText,
   notes: optionalText,
 })
 
@@ -29,6 +30,7 @@ export const updateEquipmentSchema = z.object({
   brand: patchText,
   model: patchText,
   serialNumber: patchText,
+  color: patchText,
   notes: patchText,
   isActive: z.boolean().optional(),
 })

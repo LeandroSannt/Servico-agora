@@ -9,8 +9,8 @@ describe('equipmentSchema', () => {
   })
 
   it('campos opcionais vazios viram null e o nome é aparado', () => {
-    const r = equipmentSchema.safeParse({ name: ' Split sala ', brand: '', model: '  ', serialNumber: 'AB1' })
-    expect(r.data).toEqual({ name: 'Split sala', brand: null, model: null, serialNumber: 'AB1', notes: null })
+    const r = equipmentSchema.safeParse({ name: ' Split sala ', brand: '', model: '  ', serialNumber: 'AB1', color: ' Azul ' })
+    expect(r.data).toEqual({ name: 'Split sala', brand: null, model: null, serialNumber: 'AB1', color: 'Azul', notes: null })
   })
 })
 

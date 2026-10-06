@@ -248,6 +248,7 @@ model Equipment {
   brand        String?
   model        String?
   serialNumber String?  @map("serial_number")
+  color        String?
   notes        String?
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")

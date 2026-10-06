@@ -8,6 +8,7 @@ export interface Equipment {
   brand: string | null
   model: string | null
   serialNumber: string | null
+  color: string | null
   notes: string | null
   isActive: boolean
   clientId: string

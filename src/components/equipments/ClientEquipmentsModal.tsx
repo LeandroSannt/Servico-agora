@@ -25,7 +25,7 @@ export default function ClientEquipmentsModal({ client, onClose }: Props) {
   )
 }
 
-const EMPTY = { name: '', brand: '', model: '', serialNumber: '', notes: '' }
+const EMPTY = { name: '', brand: '', model: '', serialNumber: '', color: '', notes: '' }
 type FormState = typeof EMPTY
 
 const errorMessage = (e: unknown, fallback: string) =>
@@ -57,6 +57,7 @@ function Content({ clientId }: { clientId: string }) {
       brand: e.brand ?? '',
       model: e.model ?? '',
       serialNumber: e.serialNumber ?? '',
+      color: e.color ?? '',
       notes: e.notes ?? '',
     })
     setEditing(e.id)
@@ -143,10 +144,11 @@ function Content({ clientId }: { clientId: string }) {
         <div className="p-4 border rounded-lg bg-gray-50 space-y-3">
           {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
           <Input label="Nome *" placeholder="Ex.: Split sala" value={form.name} onChange={set('name')} />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Marca" value={form.brand} onChange={set('brand')} />
             <Input label="Modelo" value={form.model} onChange={set('model')} />
             <Input label="Nº de série" value={form.serialNumber} onChange={set('serialNumber')} />
+            <Input label="Cor" placeholder="Ex.: Branco" value={form.color} onChange={set('color')} />
           </div>
           <Textarea label="Observações" value={form.notes} onChange={set('notes')} />
           <div className="flex justify-end gap-2">
@@ -185,7 +187,7 @@ function Content({ clientId }: { clientId: string }) {
                   )}
                 </p>
                 <p className="text-sm text-gray-600 truncate">
-                  {[e.brand, e.model].filter(Boolean).join(' · ') || '—'}
+                  {[e.brand, e.model, e.color].filter(Boolean).join(' · ') || '—'}
                   {e.serialNumber ? ` · Série ${e.serialNumber}` : ''}
                 </p>
                 {e.notes && <p className="text-xs text-gray-500 mt-0.5">{e.notes}</p>}
