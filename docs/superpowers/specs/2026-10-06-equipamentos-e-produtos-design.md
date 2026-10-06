@@ -14,7 +14,7 @@
 - **Cadastro só na tela de clientes**: a ação "Equipamentos" abre um modal com a lista e as opções de criar, editar e remover.
 - **Vínculo por linha de serviço da OS**: cada serviço pode ter 0, 1 ou vários equipamentos do cliente. É opcional.
 - **Remoção:** se o equipamento nunca foi usado em OS, é apagado de vez. Se já foi usado, é **arquivado** (`isActive=false`): some da seleção em novas OSs e continua aparecendo nas OSs antigas.
-- **Produto avulso:** nome, quantidade e preço unitário, digitados na hora, sem catálogo. Total da OS = serviços cobrados + Σ(quantidade × preço) dos produtos.
+- **Produto avulso:** nome, quantidade e preço unitário (arredondado a centavos), digitados na hora, sem catálogo. Total da OS = serviços cobrados + Σ(quantidade × preço) dos produtos.
 - **OS só com produtos é permitida:** a OS precisa ter pelo menos 1 serviço **ou** 1 produto.
 - **Exibição:** formulário da OS, listagem (coluna "Equipamentos"), modal de detalhe e PDF. **O texto** das mensagens de WhatsApp/e-mail fica de fora: `{{services}}` continua listando só serviços, e `{{totalAmount}}` passa a incluir os produtos, porque é o total da OS. Numa OS só com produtos, `services`/`servicesMultiline` usam o fallback "—", já que a Meta rejeita parâmetro de template vazio.
 - **O PDF** só é gerado hoje no fluxo de WhatsApp ao marcar a OS como PAGA (`src/lib/whatsapp/index.ts:222`, a partir dos dados montados no PATCH de status). Para mostrar equipamentos e produtos no PDF, esses dados passam por `OrderPaidMessageData` → `OrderPdfData`. O texto da mensagem não muda.
@@ -27,7 +27,7 @@
 - Catálogo/estoque de produtos e autocomplete de nomes já usados.
 - Vincular produto a equipamento.
 - Histórico/filtro de OSs por equipamento.
-- Produtos/equipamentos no texto das mensagens de WhatsApp/e-mail; gráficos específicos de produtos.
+- Produtos/equipamentos no texto das mensagens de WhatsApp/e-mail (o e-mail sem serviços mostra "—"); gráficos específicos de produtos.
 
 ## Modelo de dados
 
@@ -100,8 +100,10 @@ O servidor grava cada linha do formulário como [linhas cobertas…, no máximo 
   - `serviceOrderSchema`: `services` passa a aceitar array vazio; `products: z.array(orderProductSchema).default([])`; `.refine` exige `services.length + products.length ≥ 1` com a mensagem "Adicione pelo menos um serviço ou produto" e `path: ['services']`, para o erro aparecer onde o form já mostra `errors.services?.message`.
 - `src/lib/validations/equipment.ts`: `equipmentSchema` com `name` obrigatório e os demais campos opcionais (strings vazias viram `null`).
 - `computeOrderTotal(items, products = [])`: soma os serviços como hoje + Σ `quantity × unitPrice` dos produtos.
-- `src/lib/equipments/validate-order-equipments.ts`: `invalidEquipmentIds(requested, allowed)` (pura) devolve os ids que não pertencem ao cliente ou que estão arquivados sem já estarem vinculados à OS.
-- `src/lib/equipments/format.ts`: `orderEquipmentNames(services)` devolve os nomes distintos em ordem de primeira aparição, e `summarizeNames(names, max = 2)` devolve "A, B +1".
+- `src/lib/equipments/order-equipments.ts` (puras):
+  - `invalidEquipmentIds(requested, owned, alreadyLinked)` devolve os ids que não pertencem ao cliente ou que estão arquivados sem já estarem vinculados à OS.
+  - `orderEquipmentNames(services)` devolve os nomes distintos em ordem de primeira aparição.
+  - `summarizeNames(names, max = 2)` devolve "A, B +1".
 
 ## API
 

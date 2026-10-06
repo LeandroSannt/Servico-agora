@@ -45,6 +45,7 @@
 | `src/lib/whatsapp/types.ts` | Modificar | `OrderPaidMessageData` com `equipments` por serviço e `products` |
 | `src/lib/whatsapp/message-data.ts` | Modificar | Fallback "—" sem serviços |
 | `src/lib/whatsapp/index.ts` | Modificar | Repassar equipamentos/produtos ao PDF |
+| `src/lib/email/send-email.ts` | Modificar | Fallback "—" sem serviços |
 | `src/lib/pdf/generate-order-pdf.ts` | Modificar | Builder único; seção de serviços condicional; equipamentos; tabela de produtos |
 | `src/hooks/api/use-equipments.ts` | Criar | Hooks React Query |
 | `src/hooks/api/index.ts` | Modificar | Exportar `use-equipments` |
@@ -219,6 +220,10 @@ describe('orderProductSchema', () => {
     expect(orderProductSchema.safeParse({ name: 'X', quantity: 1, unitPrice: -1 }).success).toBe(false)
   })
 
+  it('arredonda o preço a centavos', () => {
+    expect(orderProductSchema.parse({ name: 'X', quantity: 1, unitPrice: 15.555 }).unitPrice).toBe(15.56)
+  })
+
   it('rejeita quantidade 0 ou fracionária', () => {
     expect(orderProductSchema.safeParse({ name: 'X', quantity: 0, unitPrice: 1 }).success).toBe(false)
     expect(orderProductSchema.safeParse({ name: 'X', quantity: 1.5, unitPrice: 1 }).success).toBe(false)
@@ -246,8 +251,12 @@ describe('equipmentSchema', () => {
 })
 
 describe('updateEquipmentSchema', () => {
-  it('aceita só isActive (reativar)', () => {
+  it('aceita só isActive (reativar) sem apagar os outros campos', () => {
     expect(updateEquipmentSchema.safeParse({ isActive: true }).data).toEqual({ isActive: true })
+  })
+
+  it('string vazia limpa o campo', () => {
+    expect(updateEquipmentSchema.safeParse({ brand: '' }).data).toEqual({ brand: null })
   })
 })
 ```
@@ -279,12 +288,21 @@ export const equipmentSchema = z.object({
   notes: optionalText,
 })
 
+// PATCH: chave ausente fica ausente (não apaga o campo). Não reutilizar optionalText aqui:
+// no Zod 4, .optional() em volta de .nullish().transform() roda o transform e devolve null.
+const patchText = z
+  .string()
+  .trim()
+  .nullable()
+  .transform((v) => v || null)
+  .optional()
+
 export const updateEquipmentSchema = z.object({
   name: z.string().trim().min(1, 'Nome do equipamento é obrigatório').optional(),
-  brand: optionalText.optional(),
-  model: optionalText.optional(),
-  serialNumber: optionalText.optional(),
-  notes: optionalText.optional(),
+  brand: patchText,
+  model: patchText,
+  serialNumber: patchText,
+  notes: patchText,
   isActive: z.boolean().optional(),
 })
 
@@ -293,7 +311,7 @@ export type EquipmentData = z.output<typeof equipmentSchema>
 export type UpdateEquipmentData = z.output<typeof updateEquipmentSchema>
 ```
 
-Atenção: no Zod 4, `optionalText.optional()` com a chave ausente não roda o transform, então a chave fica fora do objeto (é o que o teste de `isActive` espera). Se o teste "aceita só isActive" falhar porque aparecem chaves com `null`, troque cada campo de texto de `updateEquipmentSchema` por `z.string().trim().nullish().transform(...)` envolvido em `.optional()`, ou remova as chaves `undefined` no PATCH. O que importa é o PATCH não apagar campos que não foram enviados.
+Atenção: o teste "aceita só isActive" protege o "Reativar" da UI (`PATCH {isActive:true}`). Se ele falhar, o PATCH apagaria marca/modelo/série/observações. Verificado no Zod 4.3: `patchText` devolve `{isActive:true}` → `{isActive:true}`, `{brand:''}` → `{brand:null}` e `' X '` → `'X'`.
 
 Em `src/lib/validations/order.ts`, substituir o conteúdo por:
 
@@ -321,7 +339,11 @@ export const orderServiceSchema = z.object({
 export const orderProductSchema = z.object({
   name: z.string().trim().min(1, 'Nome do produto é obrigatório'),
   quantity: z.coerce.number().int('Quantidade deve ser inteira').min(1, 'Quantidade deve ser pelo menos 1'),
-  unitPrice: z.coerce.number().min(0, 'Preço deve ser maior ou igual a zero'),
+  // Arredonda a centavos: igual à coluna Decimal(10,2), para o total bater com os produtos gravados
+  unitPrice: z.coerce
+    .number()
+    .min(0, 'Preço deve ser maior ou igual a zero')
+    .transform((v) => Math.round(v * 100) / 100),
 })
 
 export const serviceOrderSchema = z
@@ -359,7 +381,7 @@ Expected: PASS
 - [ ] **Step 5: Typecheck**
 
 Run: `npx tsc --noEmit`
-Expected: pode haver erros em `OrderForm.tsx` e nas rotas de OS, porque `products` agora é obrigatório no tipo de saída. Anote os erros: eles são resolvidos nas Tasks 6 e 11. **Não** corrija aqui fora do escopo. Se aparecer algum erro em outro arquivo, investigue.
+Expected: sem erros (`products` já passa pelo `...data` do OrderForm). Se aparecer algum erro, investigue antes de seguir.
 
 - [ ] **Step 6: Commit**
 
@@ -855,7 +877,7 @@ e logo depois do `createOrderItemsWithPackages(...)`:
             })),
 ```
 
-(Esses campos só compilam depois da Task 8, que muda o tipo `OrderPaidMessageData`. Faça a Task 8 antes de rodar o `tsc`, ou rode o typecheck só no fim da Task 8.)
+(O tipo `OrderPaidMessageData` só ganha esses campos na Task 8. Como `paidData` é uma variável, o TypeScript não acusa os campos extras, mas o PDF só os usa depois da Task 8.)
 
 4. PUT: `const totalAmount = computeOrderTotal(validatedData.services, validatedData.products)`.
 5. PUT, no `$transaction`, substituir o trecho entre o `tx.serviceOrder.update(...)` e o `return tx.serviceOrder.findUniqueOrThrow` por:
@@ -897,7 +919,11 @@ Mantenha o comentário longo que explica a ordem (a)/(b). A leitura de `linked` 
 Run: `npm test`
 Expected: PASS
 
-- [ ] **Step 7: Commit (o typecheck completo vem na Task 8)**
+- [ ] **Step 7: Typecheck e commit**
+
+Run: `npx tsc --noEmit`
+Expected: sem erros
+
 
 ```bash
 git add src/lib/equipments src/lib/packages/order-include.ts src/app/api/orders
@@ -1051,8 +1077,8 @@ export async function DELETE(_request: NextRequest, { params }: Ctx) {
 
 - [ ] **Step 4: Typecheck das rotas novas**
 
-Run: `npx tsc --noEmit 2>&1 | grep -i equipments`
-Expected: nenhuma linha (os erros de OrderForm/whatsapp, se ainda existirem, são das Tasks 8 e 11)
+Run: `npx tsc --noEmit`
+Expected: sem erros
 
 - [ ] **Step 5: Commit**
 
@@ -1066,7 +1092,7 @@ git commit -m "feat(equipamentos): API de equipamentos do cliente"
 ### Task 8: WhatsApp (fallback e dados do PDF) + PDF
 
 **Files:**
-- Modify: `src/lib/whatsapp/types.ts`, `src/lib/whatsapp/message-data.ts`, `src/lib/whatsapp/index.ts`, `src/lib/pdf/generate-order-pdf.ts`
+- Modify: `src/lib/whatsapp/types.ts`, `src/lib/whatsapp/message-data.ts`, `src/lib/whatsapp/index.ts`, `src/lib/pdf/generate-order-pdf.ts`, `src/lib/email/send-email.ts`
 - Test: `src/lib/whatsapp/__tests__/message-data.test.ts`, `src/lib/pdf/__tests__/generate-order-pdf.test.ts`
 
 - [ ] **Step 1: Testes que falham**
@@ -1240,6 +1266,7 @@ Apague o corpo duplicado de `generateOrderPdfBase64`.
 
 ```ts
   if (data.services.length > 0) {
+    ensureSpace()
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
     doc.text('SERVICOS REALIZADOS', margin, y)
@@ -1271,6 +1298,11 @@ Apague o corpo duplicado de `generateOrderPdfBase64`.
 
   if (data.products?.length) {
     y += data.services.length > 0 ? 5 : 0
+    // Título + cabeçalho não podem ficar sozinhos no fim da página
+    if (y > 240) {
+      doc.addPage()
+      y = 20
+    }
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
     doc.text('PRODUTOS', margin, y)
@@ -1290,7 +1322,15 @@ Apague o corpo duplicado de `generateOrderPdfBase64`.
 
 O restante (linha, TOTAL, datas, observações, rodapé) continua igual.
 
-5. `src/lib/whatsapp/index.ts`, em `pdfData`:
+5. `src/lib/email/send-email.ts`, em `sendOrderFinishedEmail`: OS só com produtos ficaria com a lista de serviços vazia. Acrescentar `||` com fallback ao fim da expressão de `servicesHtml` (depois do `.join('')`), sem mudar o `.map` existente:
+
+```ts
+    .join('') || '<div style="color: #6b7280; font-size: 14px; padding: 12px;">—</div>'
+```
+
+O e-mail continua sem listar produtos (fora do escopo); o total já os inclui.
+
+6. `src/lib/whatsapp/index.ts`, em `pdfData`:
 
 ```ts
     services: data.services.map((s) => ({
@@ -1311,12 +1351,12 @@ Expected: PASS
 Se o teste do PDF falhar porque o texto não aparece literal (a compressão estaria ligada), troque a asserção por uma checagem do tamanho/assinatura e valide o conteúdo manualmente na Task 13. Não ligue/desligue a compressão só por causa do teste.
 
 Run: `npx tsc --noEmit`
-Expected: só restam erros em `OrderForm.tsx` e/ou `orders/page.tsx` (Tasks 11 e 12). Nenhum erro em `src/app/api` nem em `src/lib`.
+Expected: sem erros
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/lib/whatsapp src/lib/pdf
+git add src/lib/whatsapp src/lib/pdf src/lib/email/send-email.ts
 git commit -m "feat(produtos): PDF com equipamentos e produtos; fallback de servicos vazio no WhatsApp"
 ```
 
@@ -1393,8 +1433,8 @@ Em `src/hooks/api/index.ts`, acrescentar `export * from './use-equipments'`.
 
 - [ ] **Step 2: Typecheck**
 
-Run: `npx tsc --noEmit 2>&1 | grep use-equipments`
-Expected: nenhuma linha
+Run: `npx tsc --noEmit`
+Expected: sem erros
 
 - [ ] **Step 3: Commit**
 
@@ -1655,8 +1695,8 @@ Confira os nomes das props de `Button` (`variant`, `size="icon"`, `isLoading`) e
 
 - [ ] **Step 3: Typecheck e lint**
 
-Run: `npx tsc --noEmit 2>&1 | grep -E "equipments/|clients/page"`
-Expected: nenhuma linha
+Run: `npx tsc --noEmit`
+Expected: sem erros
 
 Run: `npm run lint`
 Expected: sem erros novos
@@ -1934,7 +1974,7 @@ Ela já é chamada no `onChange` do select de cliente e em `handleCreateClient`.
 - [ ] **Step 4: Typecheck e lint**
 
 Run: `npx tsc --noEmit`
-Expected: só restam erros em `orders/page.tsx` (Task 12), se houver
+Expected: sem erros
 
 Run: `npm run lint`
 Expected: sem erros novos
