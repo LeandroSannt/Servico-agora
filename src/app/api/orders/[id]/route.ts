@@ -6,8 +6,10 @@ import { sendOrderStatusWhatsApp, sendOrderPaidWhatsApp } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/auth-utils'
 import { companyLogoUrl } from '@/lib/company-logo'
 import { createOrderItemsWithPackages, computeOrderTotal } from '@/lib/packages/consume'
-import { orderServicesInclude, displayServiceName } from '@/lib/packages/order-include'
+import { orderServicesInclude, orderProductsInclude, displayServiceName } from '@/lib/packages/order-include'
 import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS } from '@/lib/packages/order-request'
+import { lockAndValidateOrderEquipments } from '@/lib/equipments/lock'
+import { equipmentErrorResponse } from '@/lib/equipments/errors'
 
 // GET /api/orders/[id] - Buscar ordem por ID
 export async function GET(
@@ -35,6 +37,7 @@ export async function GET(
           ...orderServicesInclude,
           include: { ...orderServicesInclude.include, service: true },
         },
+        products: orderProductsInclude,
       },
     })
 
@@ -137,6 +140,7 @@ export async function PATCH(
           },
         },
         services: orderServicesInclude,
+        products: orderProductsInclude,
       },
     })
 
@@ -158,6 +162,12 @@ export async function PATCH(
               price: Number(s.price),
               quantity: s.quantity,
               description: s.description,
+              equipments: s.equipments.map((e) => e.equipment.name),
+            })),
+            products: order.products.map((p) => ({
+              name: p.name,
+              quantity: p.quantity,
+              unitPrice: Number(p.unitPrice),
             })),
             totalAmount: Number(order.totalAmount),
             description: order.description,
@@ -276,7 +286,7 @@ export async function PUT(
     }
 
     // Calcular novo total
-    const totalAmount = computeOrderTotal(validatedData.services)
+    const totalAmount = computeOrderTotal(validatedData.services, validatedData.products)
 
     // Atualizar ordem em uma transação. A ordem importa:
     // (a) o update da OS vem PRIMEIRO e trava a linha da ordem: um PUT concorrente da mesma OS
@@ -290,12 +300,30 @@ export async function PUT(
         where: { id },
         data: { description: validatedData.description, totalAmount },
       })
+      // Vínculos atuais ANTES do deleteMany (a cascata os apaga): arquivados já vinculados
+      // continuam aceitos na edição
+      const linked = await tx.orderServiceEquipment.findMany({
+        where: { orderService: { orderId: id } },
+        select: { equipmentId: true },
+      })
+      // O cliente da OS não muda na edição: valida sempre contra o cliente gravado
+      await lockAndValidateOrderEquipments(tx, {
+        clientId: existingOrder.clientId,
+        items: validatedData.services,
+        alreadyLinked: new Set(linked.map((l) => l.equipmentId)),
+      })
       await tx.orderService.deleteMany({ where: { orderId: id } })
       await createOrderItemsWithPackages(tx, {
         orderId: id,
         clientId: existingOrder.clientId,
         items: validatedData.services,
       })
+      await tx.orderProduct.deleteMany({ where: { orderId: id } })
+      for (const p of validatedData.products) {
+        await tx.orderProduct.create({
+          data: { orderId: id, name: p.name, quantity: p.quantity, unitPrice: p.unitPrice },
+        })
+      }
       return tx.serviceOrder.findUniqueOrThrow({
         where: { id },
         include: {
@@ -303,6 +331,7 @@ export async function PUT(
           createdBy: { select: { id: true, name: true } },
           store: true,
           services: orderServicesInclude,
+          products: orderProductsInclude,
         },
       })
     }, ORDER_TRANSACTION_OPTIONS)
@@ -332,7 +361,7 @@ export async function PUT(
     return NextResponse.json(order)
   } catch (error) {
     console.error('Erro ao atualizar ordem:', error)
-    const mapped = packageErrorResponse(error)
+    const mapped = packageErrorResponse(error) ?? equipmentErrorResponse(error)
     if (mapped) return mapped
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(

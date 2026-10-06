@@ -5,8 +5,10 @@ import { generateOrderNumber } from '@/lib/utils'
 import { requireAuth, getCompanyFilter } from '@/lib/auth-utils'
 import { sendOrderStatusWhatsApp } from '@/lib/whatsapp'
 import { createOrderItemsWithPackages, computeOrderTotal } from '@/lib/packages/consume'
-import { orderServicesInclude, displayServiceName } from '@/lib/packages/order-include'
+import { orderServicesInclude, orderProductsInclude, displayServiceName } from '@/lib/packages/order-include'
 import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS } from '@/lib/packages/order-request'
+import { lockAndValidateOrderEquipments } from '@/lib/equipments/lock'
+import { equipmentErrorResponse } from '@/lib/equipments/errors'
 
 // GET /api/orders - Listar ordens de serviço
 export async function GET(request: NextRequest) {
@@ -84,6 +86,7 @@ export async function GET(request: NextRequest) {
             select: { id: true, name: true },
           },
           services: orderServicesInclude,
+          products: orderProductsInclude,
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -173,7 +176,7 @@ export async function POST(request: NextRequest) {
     const orderNumber = generateOrderNumber()
 
     // Calcular total
-    const totalAmount = computeOrderTotal(validatedData.services)
+    const totalAmount = computeOrderTotal(validatedData.services, validatedData.products)
 
     // Criar ordem e itens (com consumo de pacote) em uma transação.
     // A OS é relida dentro da transação: um erro nessa leitura não deixa um 500 após o commit.
@@ -189,11 +192,21 @@ export async function POST(request: NextRequest) {
         },
         select: { id: true },
       })
+      await lockAndValidateOrderEquipments(tx, {
+        clientId: validatedData.clientId,
+        items: validatedData.services,
+      })
       await createOrderItemsWithPackages(tx, {
         orderId: created.id,
         clientId: validatedData.clientId,
         items: validatedData.services,
       })
+      for (const p of validatedData.products) {
+        // Um a um: a ordem de exibição é createdAt+id, como nos itens de serviço
+        await tx.orderProduct.create({
+          data: { orderId: created.id, name: p.name, quantity: p.quantity, unitPrice: p.unitPrice },
+        })
+      }
       return tx.serviceOrder.findUniqueOrThrow({
         where: { id: created.id },
         include: {
@@ -201,6 +214,7 @@ export async function POST(request: NextRequest) {
           createdBy: { select: { id: true, name: true } },
           store: { include: { company: true } },
           services: orderServicesInclude,
+          products: orderProductsInclude,
         },
       })
     }, ORDER_TRANSACTION_OPTIONS)
@@ -254,7 +268,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(order, { status: 201 })
   } catch (error) {
     console.error('Erro ao criar ordem:', error)
-    const mapped = packageErrorResponse(error)
+    const mapped = packageErrorResponse(error) ?? equipmentErrorResponse(error)
     if (mapped) return mapped
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
