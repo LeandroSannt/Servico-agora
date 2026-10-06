@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import axios from 'axios'
 import type { EquipmentInput } from '@/lib/validations'
 
@@ -20,6 +20,7 @@ export function useClientEquipments(clientId: string | null | undefined, opts: {
     queryFn: async () =>
       (await axios.get(`/api/clients/${clientId}/equipments`, { params: includeArchived ? { includeArchived: 1 } : {} })).data,
     enabled: !!clientId,
+    placeholderData: keepPreviousData,
   })
 }
 

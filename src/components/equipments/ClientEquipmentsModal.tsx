@@ -42,7 +42,9 @@ function Content({ clientId }: { clientId: string }) {
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNoticeState] = useState<{ text: string; tone: 'info' | 'error' } | null>(null)
+  const setNotice = (text: string | null, tone: 'info' | 'error' = 'info') =>
+    setNoticeState(text ? { text, tone } : null)
 
   const openNew = () => {
     setForm(EMPTY)
@@ -87,7 +89,7 @@ function Content({ clientId }: { clientId: string }) {
           : `"${e.name}" removido.`
       )
     } catch (err) {
-      setNotice(errorMessage(err, 'Erro ao remover equipamento'))
+      setNotice(errorMessage(err, 'Erro ao remover equipamento'), 'error')
     }
   }
 
@@ -96,16 +98,28 @@ function Content({ clientId }: { clientId: string }) {
       await update.mutateAsync({ id: e.id, data: { isActive: true } })
       setNotice(`"${e.name}" reativado.`)
     } catch (err) {
-      setNotice(errorMessage(err, 'Erro ao reativar equipamento'))
+      setNotice(errorMessage(err, 'Erro ao reativar equipamento'), 'error')
     }
   }
 
   const set = (k: keyof FormState) => (ev: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: ev.target.value }))
   const saving = create.isPending || update.isPending
+  const busy = remove.isPending || update.isPending
 
   return (
     <div className="space-y-4">
-      {notice && <div className="p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-800">{notice}</div>}
+      {notice && (
+        <div
+          role={notice.tone === 'error' ? 'alert' : 'status'}
+          className={
+            notice.tone === 'error'
+              ? 'p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700'
+              : 'p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-800'
+          }
+        >
+          {notice.text}
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
@@ -127,7 +141,7 @@ function Content({ clientId }: { clientId: string }) {
 
       {editing !== null && (
         <div className="p-4 border rounded-lg bg-gray-50 space-y-3">
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
           <Input label="Nome *" placeholder="Ex.: Split sala" value={form.name} onChange={set('name')} />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input label="Marca" value={form.brand} onChange={set('brand')} />
@@ -182,12 +196,12 @@ function Content({ clientId }: { clientId: string }) {
                     <Button type="button" variant="ghost" size="icon" title="Editar" aria-label={`Editar ${e.name}`} onClick={() => openEdit(e)}>
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" title="Remover" aria-label={`Remover ${e.name}`} onClick={() => onRemove(e)}>
+                    <Button type="button" variant="ghost" size="icon" title="Remover" aria-label={`Remover ${e.name}`} disabled={busy || e.id === editing} onClick={() => onRemove(e)}>
                       <Trash2 className="w-4 h-4 text-red-500" />
                     </Button>
                   </>
                 ) : (
-                  <Button type="button" variant="ghost" size="icon" title="Reativar" aria-label={`Reativar ${e.name}`} onClick={() => reactivate(e)}>
+                  <Button type="button" variant="ghost" size="icon" title="Reativar" aria-label={`Reativar ${e.name}`} disabled={busy} onClick={() => reactivate(e)}>
                     <RotateCcw className="w-4 h-4" />
                   </Button>
                 )}
