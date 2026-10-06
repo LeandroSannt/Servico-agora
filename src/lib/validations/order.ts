@@ -20,10 +20,13 @@ export const orderServiceSchema = z.object({
 // Produto avulso (sem catálogo), digitado na OS
 export const orderProductSchema = z.object({
   name: z.string().trim().min(1, 'Nome do produto é obrigatório'),
-  quantity: z.coerce.number().int('Quantidade deve ser inteira').min(1, 'Quantidade deve ser pelo menos 1'),
+  quantity: z.coerce
+    .number({ error: 'Informe a quantidade' })
+    .int('Quantidade deve ser inteira')
+    .min(1, 'Quantidade deve ser pelo menos 1'),
   // Arredonda a centavos: igual à coluna Decimal(10,2), para o total bater com os produtos gravados
   unitPrice: z.coerce
-    .number()
+    .number({ error: 'Informe o preço' })
     .min(0, 'Preço deve ser maior ou igual a zero')
     .transform((v) => Math.round(v * 100) / 100),
 })

@@ -10,12 +10,15 @@ interface Props {
   onChange: (ids: string[]) => void
   hasClient: boolean
   loading?: boolean
+  /** Ids vinculados à OS ao abrir: continuam visíveis (mesmo arquivados) depois de desmarcados. */
+  initialIds?: string[]
 }
 
 /** Checkboxes dos equipamentos do cliente para uma linha de serviço da OS. */
-export default function EquipmentPicker({ equipments, value, onChange, hasClient, loading }: Props) {
+export default function EquipmentPicker({ equipments, value, onChange, hasClient, loading, initialIds = [] }: Props) {
   const selected = new Set(value)
-  const options = equipments.filter((e) => e.isActive || selected.has(e.id))
+  const initial = new Set(initialIds)
+  const options = equipments.filter((e) => e.isActive || selected.has(e.id) || initial.has(e.id))
 
   const toggle = (id: string, checked: boolean) =>
     onChange(checked ? [...value, id] : value.filter((v) => v !== id))

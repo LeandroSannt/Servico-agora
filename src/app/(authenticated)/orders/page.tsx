@@ -670,7 +670,7 @@ export default function OrdersPage() {
                 <div className="space-y-2">
                   {viewOrder.products!.map((p) => (
                     <div key={p.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg gap-4">
-                      <p className="font-medium text-sm sm:text-base text-gray-900 truncate">{p.name}</p>
+                      <p className="min-w-0 font-medium text-sm sm:text-base text-gray-900 truncate">{p.name}</p>
                       <div className="text-right shrink-0">
                         <p className="text-xs sm:text-sm text-gray-700">
                           {formatCurrency(Number(p.unitPrice))} x {p.quantity}

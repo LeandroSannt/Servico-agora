@@ -120,9 +120,17 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
   const clientId = watch('clientId')
   const watchedProducts = watch('products')
   // Na edição também os arquivados: os já vinculados continuam selecionáveis (marcados "arquivado")
-  const { data: clientEquipments = [], isLoading: equipmentsLoading } = useClientEquipments(clientId, {
+  const {
+    data: clientEquipments = [],
+    isLoading: equipmentsLoading,
+    isPlaceholderData: equipmentsArePlaceholder,
+  } = useClientEquipments(clientId, {
     includeArchived: !!order,
   })
+  // Equipamentos já vinculados à OS ao abrir: seguem visíveis (mesmo arquivados) após desmarcar
+  const initialEquipmentIds = useRef(
+    (order?.services ?? []).flatMap((s) => s.equipments?.map((e) => e.equipment.id) ?? [])
+  )
   const {
     data: clientPackages,
     refetch: refetchBalances,
@@ -332,7 +340,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     }, 0) || 0
 
   const productsTotal = () =>
-    (watchedProducts ?? []).reduce((sum, p) => sum + (Number(p.unitPrice) || 0) * (Number(p.quantity) || 0), 0)
+    (watchedProducts ?? []).reduce((sum, p) => sum + (Math.round((Number(p.unitPrice) || 0) * 100) / 100) * (Number(p.quantity) || 0), 0)
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -726,7 +734,8 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                     value={f.value ?? []}
                     onChange={f.onChange}
                     hasClient={!!clientId}
-                    loading={equipmentsLoading}
+                    initialIds={initialEquipmentIds.current}
+                    loading={equipmentsLoading || equipmentsArePlaceholder}
                   />
                 )}
               />

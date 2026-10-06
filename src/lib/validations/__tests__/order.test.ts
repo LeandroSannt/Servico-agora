@@ -66,4 +66,13 @@ describe('orderProductSchema', () => {
     expect(orderProductSchema.safeParse({ name: 'X', quantity: 0, unitPrice: 1 }).success).toBe(false)
     expect(orderProductSchema.safeParse({ name: 'X', quantity: 1.5, unitPrice: 1 }).success).toBe(false)
   })
+
+  it('mensagens em português para quantidade e preço vazios (NaN)', () => {
+    const q = orderProductSchema.safeParse({ name: 'X', quantity: NaN, unitPrice: 1 })
+    expect(q.success).toBe(false)
+    expect(q.error?.issues[0].message).toBe('Informe a quantidade')
+    const p = orderProductSchema.safeParse({ name: 'X', quantity: 1, unitPrice: NaN })
+    expect(p.success).toBe(false)
+    expect(p.error?.issues[0].message).toBe('Informe o preço')
+  })
 })
