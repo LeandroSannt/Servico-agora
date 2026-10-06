@@ -105,13 +105,13 @@ O servidor grava cada linha do formulário como [linhas cobertas…, no máximo 
 
 ## API
 
-**Equipamentos** (mesmo controle de acesso por loja de `clients/[id]/packages`):
+**Equipamentos** (todas as rotas, inclusive as de escrita: `requireAuth()` + carregar o cliente + `denyIfNoStoreAccess` de `src/lib/packages/store-access.ts`, como no GET de `clients/[id]/packages`; sem a restrição de papel do POST de pacotes):
 
 - `GET /api/clients/[id]/equipments?includeArchived=1`: por padrão retorna só os ativos, ordenados por nome.
 - `POST /api/clients/[id]/equipments`: cria e devolve 201.
 - `PATCH /api/clients/[id]/equipments/[equipmentId]`: edita os campos, e `isActive: true` permite reativar.
 - `DELETE /api/clients/[id]/equipments/[equipmentId]`: se há `OrderServiceEquipment`, faz `isActive=false` e devolve `{ archived: true }`; senão apaga e devolve `{ archived: false }`. Se uma OS vincular o equipamento entre a checagem e o delete, o cascade apagaria o vínculo. Para evitar isso, a checagem e o delete rodam numa transação que trava a linha do equipamento (`SELECT … FOR UPDATE`), e a gravação da OS trava os equipamentos que referencia (`FOR SHARE`) ao validá-los. Equipamento de outro cliente devolve 404.
-- O acesso segue `clients/[id]/route.ts`: o cliente precisa estar numa loja acessível ao usuário (SUPER_ADMIN tudo; COMPANY_ADMIN a própria empresa; MANAGER/EMPLOYEE a própria loja).
+- Regra de acesso: o cliente precisa estar numa loja acessível ao usuário (SUPER_ADMIN tudo; COMPANY_ADMIN a própria empresa; MANAGER/EMPLOYEE a própria loja). **Não** copiar `clients/[id]/route.ts`, que hoje não checa a loja.
 
 **OS** (`POST /api/orders`, `PUT /api/orders/[id]`):
 
