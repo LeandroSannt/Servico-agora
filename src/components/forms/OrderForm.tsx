@@ -1,6 +1,6 @@
 'use client'
 
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useSession } from 'next-auth/react'
 import { Button, Input, Textarea, Select, Checkbox, Modal } from '@/components/ui'
@@ -13,7 +13,10 @@ import {
   useCreateClient,
   useStores,
   useClientPackages,
+  useClientEquipments,
 } from '@/hooks/api'
+import EquipmentPicker from '@/components/orders/EquipmentPicker'
+import OrderProductsSection from '@/components/orders/OrderProductsSection'
 import { regroupOrderItems, catalogPriceFromItems } from '@/lib/packages/regroup'
 import {
   buildBalanceByService,
@@ -42,7 +45,9 @@ interface OrderFormProps {
       quantity: number
       packageUsage?: { quantity: number; clientPackage: { id: string; name: string } } | null
       service?: { price: number | string } | null
+      equipments?: { equipment: { id: string; name: string; isActive: boolean } }[]
     }[]
+    products?: { id: string; name: string; quantity: number; unitPrice: number | string }[]
   } | null
   onSuccess: () => void
   onCancel: () => void
@@ -77,6 +82,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     saveGlobally: false,
     isExisting: false,
     usePackageQuantity: 0,
+    equipmentIds: [] as string[],
   }
 
   const {
@@ -100,6 +106,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       services: order?.services
         ? regroupOrderItems(order.services, catalogPriceFromItems(order.services))
         : [emptyServiceItem],
+      products: (order?.products ?? []).map((p) => ({ name: p.name, quantity: p.quantity, unitPrice: Number(p.unitPrice) })),
     },
   })
 
@@ -111,6 +118,19 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
   const watchedServices = watch('services')
   const storeId = watch('storeId')
   const clientId = watch('clientId')
+  const watchedProducts = watch('products')
+  // Na edição também os arquivados: os já vinculados continuam selecionáveis (marcados "arquivado")
+  const {
+    data: clientEquipments = [],
+    isLoading: equipmentsLoading,
+    isPlaceholderData: equipmentsArePlaceholder,
+  } = useClientEquipments(clientId, {
+    includeArchived: !!order,
+  })
+  // Equipamentos já vinculados à OS ao abrir: seguem visíveis (mesmo arquivados) após desmarcar
+  const initialEquipmentIds = useRef(
+    (order?.services ?? []).flatMap((s) => s.equipments?.map((e) => e.equipment.id) ?? [])
+  )
   const {
     data: clientPackages,
     refetch: refetchBalances,
@@ -159,12 +179,14 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     onChange: (e: { target: { value: string } }) => syncPackageUseWithQuantity(index, e.target.value),
   })
 
-  // Saldos pertencem ao cliente anterior: desmarca o uso de pacote de todos os itens
+  // Saldos e equipamentos pertencem ao cliente anterior: desmarca o uso de pacote e os
+  // equipamentos de todos os itens
   const resetPackageUse = () => {
     const items = getValues('services') ?? []
     items.forEach((_, i) => setValue(`services.${i}.usePackageQuantity`, 0))
     toggledLineKeys.current.clear()
     pendingDefaultLineKeys.current.clear()
+    items.forEach((_, i) => setValue(`services.${i}.equipmentIds`, []))
   }
 
   // Serviço do catálogo escolhido antes de os saldos chegarem: aplica o padrão uma vez quando
@@ -311,14 +333,14 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     }
   }
 
-  const calculateTotal = () => {
-    return (
-      watchedServices?.reduce((sum, s, i) => {
-        const charged = Math.max(0, (Number(s.quantity) || 1) - (effectiveUse[i] ?? 0))
-        return sum + (Number(s.price) || 0) * charged
-      }, 0) || 0
-    )
-  }
+  const servicesTotal = () =>
+    watchedServices?.reduce((sum, s, i) => {
+      const charged = Math.max(0, (Number(s.quantity) || 1) - (effectiveUse[i] ?? 0))
+      return sum + (Number(s.price) || 0) * charged
+    }, 0) || 0
+
+  const productsTotal = () =>
+    (watchedProducts ?? []).reduce((sum, p) => sum + (Math.round((Number(p.unitPrice) || 0) * 100) / 100) * (Number(p.quantity) || 0), 0)
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -347,6 +369,11 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
           price: Number(service.price) || 0,
           quantity: Number(service.quantity) || 1,
           usePackageQuantity: submitUse[index],
+        })),
+        products: (data.products ?? []).map((p) => ({
+          name: p.name,
+          quantity: Number(p.quantity) || 1,
+          unitPrice: Number(p.unitPrice) || 0,
         })),
       }
 
@@ -480,6 +507,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                 saveGlobally: false,
                 isExisting: false, // Novo serviço adicionado durante edição
                 usePackageQuantity: 0,
+                equipmentIds: [],
               })
             }
           >
@@ -498,7 +526,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                 <span className="text-sm font-medium text-gray-500">
                   Serviço #{index + 1}
                 </span>
-                {fields.length > 1 && (
+                {(fields.length > 1 || (watchedProducts?.length ?? 0) > 0) && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -697,20 +725,48 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                 </div>
                 )
               })()}
+              <Controller
+                control={control}
+                name={`services.${index}.equipmentIds`}
+                render={({ field: f }) => (
+                  <EquipmentPicker
+                    equipments={clientEquipments}
+                    value={f.value ?? []}
+                    onChange={f.onChange}
+                    hasClient={!!clientId}
+                    initialIds={initialEquipmentIds.current}
+                    loading={equipmentsLoading || equipmentsArePlaceholder}
+                  />
+                )}
+              />
             </div>
           ))}
         </div>
 
-        {errors.services?.message && (
-          <p className="text-sm text-red-600 mt-2">{errors.services.message}</p>
+        {(errors.services?.message || errors.services?.root?.message) && (
+          <p className="text-sm text-red-600 mt-2">{errors.services?.message || errors.services?.root?.message}</p>
         )}
       </div>
 
+      <OrderProductsSection control={control} register={register} errors={errors} />
+
       {/* Total */}
-      <div className="border-t pt-4">
+      <div className="border-t pt-4 space-y-1">
+        {(watchedProducts?.length ?? 0) > 0 && (
+          <>
+            <div className="flex justify-between text-sm text-gray-700">
+              <span>Serviços</span>
+              <span>{formatCurrency(servicesTotal())}</span>
+            </div>
+            <div className="flex justify-between text-sm text-gray-700">
+              <span>Produtos</span>
+              <span>{formatCurrency(productsTotal())}</span>
+            </div>
+          </>
+        )}
         <div className="flex justify-between items-center text-lg font-bold">
           <span className="text-gray-900">Total:</span>
-          <span className="text-green-600">{formatCurrency(calculateTotal())}</span>
+          <span className="text-green-600">{formatCurrency(servicesTotal() + productsTotal())}</span>
         </div>
       </div>
 

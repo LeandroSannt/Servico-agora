@@ -74,6 +74,10 @@ export async function createOrderItemsWithPackages(tx: Prisma.TransactionClient,
       balancesByService.set(serviceId, result.balances)
     }
 
+    const equipmentLinks = item.equipmentIds?.length
+      ? { create: item.equipmentIds.map((equipmentId) => ({ equipmentId })) }
+      : undefined
+
     for (const part of splitOrderItem(item, allocations)) {
       const created = await tx.orderService.create({
         data: {
@@ -84,6 +88,7 @@ export async function createOrderItemsWithPackages(tx: Prisma.TransactionClient,
           price: part.price,
           quantity: part.quantity,
           saveGlobally: part.saveGlobally,
+          equipments: equipmentLinks,
         },
       })
       if (part.allocation) {
@@ -100,7 +105,12 @@ export async function createOrderItemsWithPackages(tx: Prisma.TransactionClient,
   }
 }
 
-/** Total cobrado: itens cobertos saem a 0. */
-export function computeOrderTotal(items: OrderItemInput[]): number {
-  return items.reduce((sum, i) => sum + i.price * Math.max(0, i.quantity - (i.usePackageQuantity ?? 0)), 0)
+/** Total cobrado: itens cobertos saem a 0; produtos somam quantidade x preço. Arredondado a centavos. */
+export function computeOrderTotal(
+  items: OrderItemInput[],
+  products: { quantity: number; unitPrice: number }[] = []
+): number {
+  const services = items.reduce((sum, i) => sum + i.price * Math.max(0, i.quantity - (i.usePackageQuantity ?? 0)), 0)
+  const extras = products.reduce((sum, p) => sum + p.unitPrice * p.quantity, 0)
+  return Math.round((services + extras) * 100) / 100
 }

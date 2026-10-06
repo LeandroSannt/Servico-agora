@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Plus, Edit2, Trash2, Eye, ClipboardList, Play, CheckCircle, ArrowRight, Calendar, X, DollarSign, Inbox, Pause, MoreVertical } from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, Eye, ClipboardList, Play, CheckCircle, ArrowRight, Calendar, X, DollarSign, Inbox, Pause, MoreVertical, Wrench } from 'lucide-react'
 import { Button, Input, Modal, Badge, EmptyState, Select, Textarea } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui'
 import OrderForm from '@/components/forms/OrderForm'
 import { useOrders, useDeleteOrder, useUpdateOrderStatus } from '@/hooks/api'
+import { orderEquipmentNames, summarizeNames } from '@/lib/equipments/order-equipments'
 
 interface OrderService {
   id: string
@@ -16,6 +17,7 @@ interface OrderService {
   quantity: number
   packageUsage?: { quantity: number; clientPackage: { id: string; name: string } } | null
   service?: { price: number | string } | null
+  equipments?: { equipment: { id: string; name: string; isActive: boolean } }[]
 }
 
 interface Order {
@@ -27,6 +29,7 @@ interface Order {
   client: { id: string; name: string; phone: string; email: string | null }
   store: { id: string; name: string }
   services: OrderService[]
+  products?: { id: string; name: string; quantity: number; unitPrice: number | string }[]
   createdAt: string
   updatedAt: string
 }
@@ -223,6 +226,12 @@ export default function OrdersPage() {
             </div>
             <p className="font-medium text-gray-900 mt-1 truncate">{order.client.name}</p>
             <p className="text-xs text-gray-500">{order.client.phone}</p>
+            {orderEquipmentNames(order.services).length > 0 && (
+              <p className="flex items-center gap-1 text-xs text-gray-600 mt-0.5 truncate">
+                <Wrench className="h-3 w-3 shrink-0" />
+                {summarizeNames(orderEquipmentNames(order.services))}
+              </p>
+            )}
           </div>
           <div className="relative">
             <button
@@ -442,7 +451,7 @@ export default function OrdersPage() {
                 <TableRow>
                   <TableHead>Número</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Loja</TableHead>
+                  <TableHead>Equipamentos</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Data</TableHead>
@@ -464,7 +473,19 @@ export default function OrdersPage() {
                           <p className="text-sm text-gray-500">{order.client.phone}</p>
                         </div>
                       </TableCell>
-                      <TableCell>{order.store.name}</TableCell>
+                      <TableCell className="max-w-[220px]">
+                        {(() => {
+                          const names = orderEquipmentNames(order.services)
+                          return (
+                            <span
+                              className={names.length ? 'text-sm text-gray-800' : 'text-gray-400'}
+                              title={names.join(', ') || undefined}
+                            >
+                              {summarizeNames(names)}
+                            </span>
+                          )
+                        })()}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <button
@@ -602,6 +623,7 @@ export default function OrdersPage() {
             )}
 
             {/* Services */}
+            {viewOrder.services.length > 0 && (
             <div className="border-t pt-4">
               <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Serviços</h4>
               <div className="space-y-2">
@@ -618,6 +640,12 @@ export default function OrdersPage() {
                       {service.description && (
                         <p className="text-xs sm:text-sm text-gray-700 truncate">{service.description}</p>
                       )}
+                      {(service.equipments?.length ?? 0) > 0 && (
+                        <p className="flex items-center gap-1 text-xs text-gray-600 mt-0.5">
+                          <Wrench className="h-3 w-3 shrink-0" />
+                          Equipamentos: {service.equipments!.map((e) => e.equipment.name).join(', ')}
+                        </p>
+                      )}
                     </div>
                     <div className="sm:text-right flex sm:flex-col justify-between sm:justify-end items-center sm:items-end">
                       <p className="text-xs sm:text-sm text-gray-700">
@@ -631,6 +659,29 @@ export default function OrdersPage() {
                 ))}
               </div>
             </div>
+            )}
+
+            {/* Products */}
+            {(viewOrder.products?.length ?? 0) > 0 && (
+              <div className="border-t pt-4">
+                <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Produtos</h4>
+                <div className="space-y-2">
+                  {viewOrder.products!.map((p) => (
+                    <div key={p.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg gap-4">
+                      <p className="min-w-0 font-medium text-sm sm:text-base text-gray-900 truncate">{p.name}</p>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs sm:text-sm text-gray-700">
+                          {formatCurrency(Number(p.unitPrice))} x {p.quantity}
+                        </p>
+                        <p className="font-semibold text-green-600 text-sm sm:text-base">
+                          {formatCurrency(Number(p.unitPrice) * p.quantity)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Dates */}
             <div className="border-t pt-4 text-xs sm:text-sm text-gray-600 space-y-1">

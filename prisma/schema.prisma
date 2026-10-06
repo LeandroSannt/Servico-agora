@@ -135,6 +135,7 @@ model Client {
 
   serviceOrders ServiceOrder[]
   packages ClientPackage[]
+  equipments Equipment[]
 
   @@map("clients")
 }
@@ -197,6 +198,7 @@ model ServiceOrder {
   // Serviços da OS
   services OrderService[]
   packageUsages PackageUsage[]
+  products OrderProduct[]
 
   @@map("service_orders")
 }
@@ -232,8 +234,61 @@ model OrderService {
   orderId String       @map("order_id")
   order   ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   packageUsage PackageUsage?
+  equipments OrderServiceEquipment[]
 
   @@map("order_services")
+}
+
+// ==================== EQUIPAMENTOS / PRODUTOS ====================
+
+// Equipamento do cliente (ex.: "Split sala"). Removido com vínculo em OS => arquivado (isActive=false).
+model Equipment {
+  id           String   @id @default(cuid())
+  name         String
+  brand        String?
+  model        String?
+  serialNumber String?  @map("serial_number")
+  color        String?
+  notes        String?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  clientId String @map("client_id")
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  orderServices OrderServiceEquipment[]
+
+  @@index([clientId])
+  @@map("equipments")
+}
+
+// Equipamentos de cada linha de serviço da OS. Cascade nos dois lados (regra do projeto);
+// o histórico é protegido na API: DELETE de equipamento usado arquiva em vez de apagar.
+model OrderServiceEquipment {
+  orderServiceId String       @map("order_service_id")
+  orderService   OrderService @relation(fields: [orderServiceId], references: [id], onDelete: Cascade)
+  equipmentId    String       @map("equipment_id")
+  equipment      Equipment    @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@id([orderServiceId, equipmentId])
+  @@index([equipmentId])
+  @@map("order_service_equipments")
+}
+
+// Produto avulso vendido na OS (sem catálogo); entra no total da OS
+model OrderProduct {
+  id        String   @id @default(cuid())
+  name      String
+  quantity  Int      @default(1)
+  unitPrice Decimal  @db.Decimal(10, 2) @map("unit_price")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  orderId String       @map("order_id")
+  order   ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_products")
 }
 
 // ==================== WHATSAPP ====================

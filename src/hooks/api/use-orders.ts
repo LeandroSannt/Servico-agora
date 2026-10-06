@@ -11,6 +11,7 @@ interface OrderService {
   serviceId: string | null
   packageUsage?: { quantity: number; clientPackage: { id: string; name: string } } | null
   service?: { price: number | string } | null
+  equipments?: { equipment: { id: string; name: string; isActive: boolean } }[]
 }
 
 interface Order {
@@ -25,6 +26,7 @@ interface Order {
   store: { id: string; name: string }
   createdBy: { id: string; name: string } | null
   services: OrderService[]
+  products?: { id: string; name: string; quantity: number; unitPrice: number | string }[]
   createdAt: string
   updatedAt: string
 }

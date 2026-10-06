@@ -34,6 +34,7 @@ describe('regroupOrderItems', () => {
         saveGlobally: false,
         isExisting: true,
         usePackageQuantity: 0,
+        equipmentIds: [],
       },
       {
         serviceId: '',
@@ -44,6 +45,7 @@ describe('regroupOrderItems', () => {
         saveGlobally: false,
         isExisting: true,
         usePackageQuantity: 0,
+        equipmentIds: [],
       },
     ])
   })
@@ -166,6 +168,43 @@ describe('regroupOrderItems', () => {
       [
         item({ serviceId: 'svc-a', price: 0, quantity: 1, packageUsage: { quantity: 1 } }),
         item({ serviceId: 'svc-b', price: 50, quantity: 1 }),
+      ],
+      noCatalog
+    )
+    expect(result).toHaveLength(2)
+  })
+
+  const eq = (...ids: string[]) => ids.map((id) => ({ equipment: { id } }))
+
+  it('leva os equipmentIds (ordenados) do grupo', () => {
+    const result = regroupOrderItems(
+      [
+        item({ price: 0, quantity: 2, packageUsage: { quantity: 2 }, equipments: eq('e2', 'e1') }),
+        item({ price: 30, quantity: 1, equipments: eq('e1', 'e2') }),
+      ],
+      noCatalog
+    )
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({ quantity: 3, usePackageQuantity: 2, equipmentIds: ['e1', 'e2'] })
+  })
+
+  it('não funde coberto e cobrado do mesmo serviço com equipamentos diferentes', () => {
+    const result = regroupOrderItems(
+      [
+        item({ price: 0, quantity: 1, packageUsage: { quantity: 1 }, equipments: eq('e1') }),
+        item({ price: 30, quantity: 1, equipments: eq('e2') }),
+      ],
+      noCatalog
+    )
+    expect(result).toHaveLength(2)
+    expect(result.map((r) => r.equipmentIds)).toEqual([['e1'], ['e2']])
+  })
+
+  it('não funde duas cobertas com equipamentos diferentes', () => {
+    const result = regroupOrderItems(
+      [
+        item({ price: 0, quantity: 1, packageUsage: { quantity: 1 }, equipments: eq('e1') }),
+        item({ price: 0, quantity: 1, packageUsage: { quantity: 1 }, equipments: eq('e2') }),
       ],
       noCatalog
     )
