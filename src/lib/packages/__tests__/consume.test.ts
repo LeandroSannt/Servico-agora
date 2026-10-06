@@ -25,6 +25,22 @@ describe('computeOrderTotal', () => {
   it('usePackageQuantity maior que a quantidade nunca deixa o total negativo', () => {
     expect(computeOrderTotal([{ serviceName: 'Limpeza', price: 30, quantity: 3, usePackageQuantity: 5 }])).toBe(0)
   })
+
+  it('soma os produtos (quantidade x preço unitário)', () => {
+    expect(
+      computeOrderTotal(
+        [{ serviceName: 'Limpeza', price: 30, quantity: 3, usePackageQuantity: 2 }],
+        [
+          { quantity: 2, unitPrice: 15.5 },
+          { quantity: 1, unitPrice: 9.9 },
+        ]
+      )
+    ).toBe(70.9)
+  })
+
+  it('OS só com produtos', () => {
+    expect(computeOrderTotal([], [{ quantity: 3, unitPrice: 0.1 }])).toBe(0.3)
+  })
 })
 
 describe('createOrderItemsWithPackages: guarda de entrada', () => {
