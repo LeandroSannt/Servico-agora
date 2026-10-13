@@ -5,6 +5,7 @@ import { sendOrderFinishedEmail } from '@/lib/email/send-email'
 import { sendOrderStatusWhatsApp, sendOrderPaidWhatsApp } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/auth-utils'
 import { companyLogoUrl } from '@/lib/company-logo'
+import { orderDateFromInput } from '@/lib/order-date'
 import { createOrderItemsWithPackages, computeOrderTotal } from '@/lib/packages/consume'
 import { orderServicesInclude, orderProductsInclude, displayServiceName } from '@/lib/packages/order-include'
 import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS } from '@/lib/packages/order-request'
@@ -298,7 +299,11 @@ export async function PUT(
     const order = await prisma.$transaction(async (tx) => {
       await tx.serviceOrder.update({
         where: { id },
-        data: { description: validatedData.description, totalAmount },
+        data: {
+          description: validatedData.description,
+          totalAmount,
+          ...(validatedData.createdAt && { createdAt: orderDateFromInput(validatedData.createdAt) }),
+        },
       })
       // Vínculos atuais ANTES do deleteMany (a cascata os apaga): arquivados já vinculados
       // continuam aceitos na edição

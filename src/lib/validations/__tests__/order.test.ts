@@ -76,3 +76,22 @@ describe('orderProductSchema', () => {
     expect(p.error?.issues[0].message).toBe('Informe o preço')
   })
 })
+
+describe('serviceOrderSchema.createdAt', () => {
+  const base = {
+    clientId: 'c1',
+    storeId: 's1',
+    services: [{ serviceName: 'Limpeza', price: 30, quantity: 1 }],
+  }
+
+  it('aceita YYYY-MM-DD, vazio e ausente', () => {
+    expect(serviceOrderSchema.safeParse({ ...base, createdAt: '2026-10-01' }).success).toBe(true)
+    expect(serviceOrderSchema.safeParse({ ...base, createdAt: '' }).success).toBe(true)
+    expect(serviceOrderSchema.safeParse(base).success).toBe(true)
+  })
+
+  it('rejeita formato e data inválidos', () => {
+    expect(serviceOrderSchema.safeParse({ ...base, createdAt: '01/10/2026' }).success).toBe(false)
+    expect(serviceOrderSchema.safeParse({ ...base, createdAt: '2026-13-45' }).success).toBe(false)
+  })
+})
