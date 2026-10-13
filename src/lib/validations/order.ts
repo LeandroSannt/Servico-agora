@@ -34,6 +34,13 @@ export const orderProductSchema = z.object({
 export const serviceOrderSchema = z
   .object({
     description: z.string().optional(),
+    // Data de criação (YYYY-MM-DD). Vazio/ausente: criação usa agora; edição mantém a data atual
+    createdAt: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida')
+      .refine((v) => !Number.isNaN(new Date(`${v}T12:00:00.000Z`).getTime()), 'Data inválida')
+      .or(z.literal(''))
+      .optional(),
     clientId: z.string().min(1, 'Cliente é obrigatório'),
     storeId: z.string().min(1, 'Loja é obrigatória'),
     services: z.array(orderServiceSchema),

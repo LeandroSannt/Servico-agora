@@ -24,6 +24,7 @@ import {
   availableBefore,
   syncUseWithQuantity,
 } from '@/lib/packages/form-balance'
+import { toDateInputValue } from '@/lib/order-date'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Plus, Trash2, X, UserPlus, Store, Package } from 'lucide-react'
 
@@ -32,6 +33,7 @@ interface OrderFormProps {
     id: string
     orderNumber: string
     description: string | null
+    createdAt?: string
     status: string
     totalAmount: number
     client: { id: string; name: string }
@@ -73,6 +75,10 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
   const initialStoreId = order?.store?.id || userStore?.id || ''
   const storeName = order?.store?.name || userStore?.name || ''
 
+  // Data de criação: a da OS ao editar, hoje ao criar
+  const todayValue = toDateInputValue(new Date())
+  const initialDate = order?.createdAt ? toDateInputValue(order.createdAt) : todayValue
+
   const emptyServiceItem = {
     serviceId: '',
     serviceName: '',
@@ -99,6 +105,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     resolver: zodResolver(serviceOrderSchema) as any,
     defaultValues: {
       description: order?.description || '',
+      createdAt: initialDate,
       storeId: initialStoreId,
       clientId: order?.client?.id || '',
       // Itens vindos de pacote são reagrupados com o irmão cobrado; itens 100% cobertos (gravados
@@ -362,8 +369,11 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
     try {
       // Garantir que price e quantity são números; o uso de pacote enviado nunca passa do saldo
       const submitUse = computeEffectiveUse(data.services, balanceByService)
+      // Data intocada (a da OS ao editar, hoje ao criar) não é enviada: preserva o horário real
+      const dateUnchanged = !data.createdAt || data.createdAt === (order ? initialDate : todayValue)
       const normalizedData = {
         ...data,
+        createdAt: dateUnchanged ? undefined : data.createdAt,
         services: data.services.map((service, index) => ({
           ...service,
           price: Number(service.price) || 0,
@@ -479,6 +489,17 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
             </p>
           )}
         </div>
+      </div>
+
+      {/* Data de criação */}
+      <div className="max-w-xs">
+        <Input
+          label="Data de criação"
+          type="date"
+          max={todayValue}
+          error={errors.createdAt?.message}
+          {...register('createdAt')}
+        />
       </div>
 
       {/* Description */}

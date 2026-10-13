@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { serviceOrderSchema } from '@/lib/validations'
 import { generateOrderNumber } from '@/lib/utils'
+import { orderDateFromInput } from '@/lib/order-date'
 import { requireAuth, getCompanyFilter } from '@/lib/auth-utils'
 import { sendOrderStatusWhatsApp } from '@/lib/whatsapp'
 import { createOrderItemsWithPackages, computeOrderTotal } from '@/lib/packages/consume'
@@ -189,6 +190,7 @@ export async function POST(request: NextRequest) {
           clientId: validatedData.clientId,
           createdById: user!.id, // Usa o usuário autenticado
           totalAmount,
+          ...(validatedData.createdAt && { createdAt: orderDateFromInput(validatedData.createdAt) }),
         },
         select: { id: true },
       })
