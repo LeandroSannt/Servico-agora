@@ -12,6 +12,8 @@ export interface Equipment {
   notes: string | null
   isActive: boolean
   clientId: string
+  tags: string[]
+  photos: { id: string }[]
 }
 
 export function useClientEquipments(clientId: string | null | undefined, opts: { includeArchived?: boolean } = {}) {
