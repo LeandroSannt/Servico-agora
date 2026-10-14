@@ -24,6 +24,8 @@ interface Client {
   state: string | null
   zipCode: string | null
   notes: string | null
+  isVip: boolean
+  vipCompanyName: string | null
   storeId: string
   store: { id: string; name: string }
   _count?: { serviceOrders: number }
@@ -96,7 +98,13 @@ export default function ClientsPage() {
             {client.name.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <p className="font-medium text-gray-900 truncate">{client.name}</p>
+            <p className="font-medium text-gray-900 truncate">
+              {client.name}
+              {client.isVip && <Badge variant="warning" className="ml-2 align-middle">VIP</Badge>}
+            </p>
+            {client.isVip && client.vipCompanyName && (
+              <p className="text-xs text-gray-500 truncate">{client.vipCompanyName}</p>
+            )}
             <p className="text-xs text-gray-500">{client.store.name}</p>
           </div>
         </div>
@@ -284,7 +292,13 @@ export default function ClientsPage() {
                             {client.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900">{client.name}</p>
+                            <p className="font-medium text-gray-900">
+                              {client.name}
+                              {client.isVip && <Badge variant="warning" className="ml-2 align-middle">VIP</Badge>}
+                            </p>
+                            {client.isVip && client.vipCompanyName && (
+                              <p className="text-sm text-gray-500">{client.vipCompanyName}</p>
+                            )}
                             <p className="text-sm text-gray-500">{client.store.name}</p>
                           </div>
                         </div>

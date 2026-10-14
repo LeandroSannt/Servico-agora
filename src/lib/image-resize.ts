@@ -26,10 +26,10 @@ interface Attempt {
 }
 
 /**
- * Reduz a imagem e devolve um data URL que cabe em MAX_LOGO_DATA_BYTES.
+ * Reduz a imagem e devolve um data URL que cabe em maxBytes (padrão: MAX_LOGO_DATA_BYTES).
  * Tenta WebP, depois PNG e, por fim, JPEG em tamanhos menores (Safari/iOS não gera WebP no canvas).
  */
-export async function resizeImageToDataUrl(file: File, max = 512): Promise<string> {
+export async function resizeImageToDataUrl(file: File, max = 512, maxBytes = MAX_LOGO_DATA_BYTES): Promise<string> {
   const url = URL.createObjectURL(file)
   try {
     const img = await loadImage(url)
@@ -60,10 +60,10 @@ export async function resizeImageToDataUrl(file: File, max = 512): Promise<strin
       const dataUrl = canvas.toDataURL(attempt.mime, attempt.quality)
       // O navegador cai para PNG quando não sabe gerar o formato pedido
       if (!dataUrl.startsWith(`data:${attempt.mime}`)) continue
-      if (decodedSize(dataUrl) <= MAX_LOGO_DATA_BYTES) return dataUrl
+      if (decodedSize(dataUrl) <= maxBytes) return dataUrl
     }
 
-    throw new Error('Imagem muito grande (máx. 300 KB)')
+    throw new Error(`Imagem muito grande (máx. ${Math.round(maxBytes / 1024)} KB)`)
   } finally {
     URL.revokeObjectURL(url)
   }

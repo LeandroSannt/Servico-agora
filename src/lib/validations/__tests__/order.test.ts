@@ -95,3 +95,10 @@ describe('serviceOrderSchema.createdAt', () => {
     expect(serviceOrderSchema.safeParse({ ...base, createdAt: '2026-13-45' }).success).toBe(false)
   })
 })
+
+describe('orderProductSchema: catálogo', () => {
+  it('aceita produto do catálogo e saveToCatalog', () => {
+    const r = orderProductSchema.parse({ name: 'Filtro', quantity: 2, unitPrice: 10, productId: 'p1', saveToCatalog: false })
+    expect(r.productId).toBe('p1')
+  })
+})

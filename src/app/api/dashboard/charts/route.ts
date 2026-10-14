@@ -99,11 +99,12 @@ export async function GET(request: NextRequest) {
           totalAmount: true,
           status: true,
           clientId: true,
+          isVipOrder: true,
           client: { select: { name: true } },
         },
       }),
       prisma.orderService.findMany({
-        where: { order: { ...orderWhere, createdAt: periodWhere } },
+        where: { order: { ...orderWhere, createdAt: periodWhere, isVipOrder: false } },
         select: {
           serviceName: true,
           price: true,
@@ -126,7 +127,7 @@ export async function GET(request: NextRequest) {
       const bucket = timeBuckets.get(keyOf(order.createdAt))
       if (!bucket) continue
       bucket.count += 1
-      if (REVENUE_STATUSES.has(order.status)) bucket.revenue += Number(order.totalAmount)
+      if (!order.isVipOrder && REVENUE_STATUSES.has(order.status)) bucket.revenue += Number(order.totalAmount)
     }
 
     // ---- Serviços mais vendidos
@@ -147,6 +148,7 @@ export async function GET(request: NextRequest) {
     // ---- Top clientes
     const clientAgg = new Map<string, { id: string; name: string; orders: number; total: number }>()
     for (const order of orders) {
+      if (order.isVipOrder) continue // ranking por valor: OS VIP fica de fora
       const agg = clientAgg.get(order.clientId) ?? {
         id: order.clientId,
         name: order.client.name,

@@ -39,12 +39,12 @@ export async function GET(request: NextRequest) {
       prisma.client.count({ where: clientWhere }),
       // Total de OS finalizadas (aguardando pagamento)
       prisma.serviceOrder.aggregate({
-        where: { ...orderWhere, status: 'FINISHED' },
+        where: { ...orderWhere, status: 'FINISHED', isVipOrder: false },
         _sum: { totalAmount: true },
       }),
       // Total de OS pagas (receita confirmada)
       prisma.serviceOrder.aggregate({
-        where: { ...orderWhere, status: 'PAID' },
+        where: { ...orderWhere, status: 'PAID', isVipOrder: false },
         _sum: { totalAmount: true },
       }),
       // Pacotes vendidos (ativos) no período

@@ -2,14 +2,17 @@
 
 import { useState } from 'react'
 import { Pencil, Trash2, RotateCcw, Plus } from 'lucide-react'
-import { Modal, Button, Input, Textarea, Badge } from '@/components/ui'
+import { Modal, Button, Badge } from '@/components/ui'
 import {
   useClientEquipments,
   useCreateEquipment,
   useUpdateEquipment,
   useDeleteEquipment,
+  useUploadEquipmentPhoto,
+  equipmentPhotoUrl,
   type Equipment,
 } from '@/hooks/api'
+import EquipmentFields, { EMPTY_EQUIPMENT_FORM as EMPTY, type EquipmentFormState as FormState } from './EquipmentFields'
 import { equipmentSchema } from '@/lib/validations'
 
 interface Props {
@@ -25,9 +28,6 @@ export default function ClientEquipmentsModal({ client, onClose }: Props) {
   )
 }
 
-const EMPTY = { name: '', brand: '', model: '', serialNumber: '', color: '', notes: '' }
-type FormState = typeof EMPTY
-
 const errorMessage = (e: unknown, fallback: string) =>
   (e as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback
 
@@ -37,10 +37,15 @@ function Content({ clientId }: { clientId: string }) {
   const create = useCreateEquipment(clientId)
   const update = useUpdateEquipment(clientId)
   const remove = useDeleteEquipment(clientId)
+  const uploadPhoto = useUploadEquipmentPhoto(clientId)
 
   // editing: null = formulário fechado; 'new' = cadastrando; id = editando
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY)
+  const [tags, setTags] = useState<string[]>([])
+  // Fotos escolhidas ao cadastrar (enviadas após o POST do equipamento)
+  const [photosBusy, setPhotosBusy] = useState(false)
+  const [pendingPhotos, setPendingPhotos] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [notice, setNoticeState] = useState<{ text: string; tone: 'info' | 'error' } | null>(null)
   const setNotice = (text: string | null, tone: 'info' | 'error' = 'info') =>
@@ -48,6 +53,8 @@ function Content({ clientId }: { clientId: string }) {
 
   const openNew = () => {
     setForm(EMPTY)
+    setTags([])
+    setPendingPhotos([])
     setEditing('new')
     setError(null)
   }
@@ -60,6 +67,8 @@ function Content({ clientId }: { clientId: string }) {
       color: e.color ?? '',
       notes: e.notes ?? '',
     })
+    setTags(e.tags)
+    setPendingPhotos([])
     setEditing(e.id)
     setError(null)
   }
@@ -71,10 +80,22 @@ function Content({ clientId }: { clientId: string }) {
       return
     }
     try {
-      if (editing === 'new') await create.mutateAsync(form)
-      else if (editing) await update.mutateAsync({ id: editing, data: form })
+      let photoFailures = 0
+      if (editing === 'new') {
+        const created = await create.mutateAsync({ ...form, tags })
+        for (const dataUrl of pendingPhotos) {
+          try {
+            await uploadPhoto.mutateAsync({ equipmentId: created.id, dataUrl })
+          } catch {
+            photoFailures++
+          }
+        }
+      } else if (editing) await update.mutateAsync({ id: editing, data: { ...form, tags } })
       setEditing(null)
-      setNotice(null)
+      setPendingPhotos([])
+      if (photoFailures > 0) {
+        setNotice(`Equipamento salvo, mas ${photoFailures} foto(s) não foram enviadas. Edite o equipamento para tentar de novo.`, 'error')
+      } else setNotice(null)
     } catch (e) {
       setError(errorMessage(e, 'Erro ao salvar equipamento'))
     }
@@ -103,8 +124,7 @@ function Content({ clientId }: { clientId: string }) {
     }
   }
 
-  const set = (k: keyof FormState) => (ev: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: ev.target.value }))
-  const saving = create.isPending || update.isPending
+  const saving = create.isPending || update.isPending || uploadPhoto.isPending
   const busy = remove.isPending || update.isPending
 
   return (
@@ -143,19 +163,24 @@ function Content({ clientId }: { clientId: string }) {
       {editing !== null && (
         <div className="p-4 border rounded-lg bg-gray-50 space-y-3">
           {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-          <Input label="Nome *" placeholder="Ex.: Split sala" value={form.name} onChange={set('name')} />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="Marca" value={form.brand} onChange={set('brand')} />
-            <Input label="Modelo" value={form.model} onChange={set('model')} />
-            <Input label="Nº de série" value={form.serialNumber} onChange={set('serialNumber')} />
-            <Input label="Cor" placeholder="Ex.: Branco" value={form.color} onChange={set('color')} />
-          </div>
-          <Textarea label="Observações" value={form.notes} onChange={set('notes')} />
+          <EquipmentFields
+            clientId={clientId}
+            form={form}
+            onFormChange={setForm}
+            tags={tags}
+            onTagsChange={setTags}
+            equipmentId={editing !== 'new' ? editing ?? undefined : undefined}
+            photos={equipments.find((x) => x.id === editing)?.photos ?? []}
+            pendingPhotos={pendingPhotos}
+            onPendingPhotosChange={setPendingPhotos}
+            onPhotosBusyChange={setPhotosBusy}
+            disabled={saving}
+          />
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={saving}>
+            <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={saving || photosBusy}>
               Cancelar
             </Button>
-            <Button type="button" onClick={save} isLoading={saving}>
+            <Button type="button" onClick={save} isLoading={saving} disabled={photosBusy}>
               Salvar
             </Button>
           </div>
@@ -190,6 +215,28 @@ function Content({ clientId }: { clientId: string }) {
                   {[e.brand, e.model, e.color].filter(Boolean).join(' · ') || '—'}
                   {e.serialNumber ? ` · Série ${e.serialNumber}` : ''}
                 </p>
+                {e.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {e.tags.map((t) => (
+                      <span key={t} className="rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-xs text-blue-800">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {e.photos.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {e.photos.map((p) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={p.id}
+                        src={equipmentPhotoUrl(clientId, e.id, p.id)}
+                        alt={`Foto de ${e.name}`}
+                        className="h-10 w-10 rounded border object-cover"
+                      />
+                    ))}
+                  </div>
+                )}
                 {e.notes && <p className="text-xs text-gray-500 mt-0.5">{e.notes}</p>}
               </div>
               <div className="flex shrink-0 gap-1">

@@ -13,6 +13,8 @@ interface Client {
   state: string | null
   zipCode: string | null
   notes: string | null
+  isVip: boolean
+  vipCompanyName: string | null
   storeId: string
   store: { id: string; name: string }
   createdAt: string

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { updateEquipmentSchema } from '@/lib/validations'
 import { requireClientAccess } from '@/lib/equipments/client-access'
+import { equipmentInclude, serializeEquipment } from '@/lib/equipments/serialize'
 
 type Ctx = { params: Promise<{ id: string; equipmentId: string }> }
 
@@ -18,13 +19,26 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }, { status: 400 })
     }
-    // Só o equipamento deste cliente (updateMany com clientId evita editar o de outro cliente)
-    const { count } = await prisma.equipment.updateMany({ where: { id: equipmentId, clientId: id }, data: parsed.data })
-    if (count === 0) return notFound()
-    // Pode ter sido apagado entre o updateMany e a releitura
-    const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId } })
+    const { tags, ...fields } = parsed.data
+    // Só o equipamento deste cliente (o lock filtra por client_id: não edita o de outro cliente)
+    const found = await prisma.$transaction(async (tx) => {
+      // FOR UPDATE serializa PATCHes concorrentes de tags (e o DELETE do equipamento)
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM equipments WHERE id = ${equipmentId} AND client_id = ${id} FOR UPDATE`
+      if (locked.length === 0) return false
+      if (Object.keys(fields).length > 0) await tx.equipment.update({ where: { id: equipmentId }, data: fields })
+      if (tags !== undefined) {
+        // Substitui o conjunto de características
+        await tx.equipmentTag.deleteMany({ where: { equipmentId } })
+        if (tags.length > 0) await tx.equipmentTag.createMany({ data: tags.map((label) => ({ equipmentId, label })) })
+      }
+      return true
+    })
+    if (!found) return notFound()
+    // Pode ter sido apagado entre a transação e a releitura
+    const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId }, include: equipmentInclude })
     if (!equipment) return notFound()
-    return NextResponse.json(equipment)
+    return NextResponse.json(serializeEquipment(equipment))
   } catch (error) {
     console.error('Erro ao editar equipamento:', error)
     return NextResponse.json({ error: 'Erro ao editar equipamento' }, { status: 500 })

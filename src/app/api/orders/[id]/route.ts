@@ -11,6 +11,8 @@ import { orderServicesInclude, orderProductsInclude, displayServiceName } from '
 import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS } from '@/lib/packages/order-request'
 import { lockAndValidateOrderEquipments } from '@/lib/equipments/lock'
 import { equipmentErrorResponse } from '@/lib/equipments/errors'
+import { orderTotalFor } from '@/lib/vip'
+import { resolveOrderProducts, ProductAccessError } from '@/lib/products/order-products'
 
 // GET /api/orders/[id] - Buscar ordem por ID
 export async function GET(
@@ -286,8 +288,11 @@ export async function PUT(
       )
     }
 
-    // Calcular novo total
-    const totalAmount = computeOrderTotal(validatedData.services, validatedData.products)
+    // Calcular novo total (preserva o snapshot VIP da OS: total zerado)
+    const totalAmount = orderTotalFor(
+      computeOrderTotal(validatedData.services, validatedData.products),
+      existingOrder.isVipOrder
+    )
 
     // Atualizar ordem em uma transação. A ordem importa:
     // (a) o update da OS vem PRIMEIRO e trava a linha da ordem: um PUT concorrente da mesma OS
@@ -324,9 +329,10 @@ export async function PUT(
         items: validatedData.services,
       })
       await tx.orderProduct.deleteMany({ where: { orderId: id } })
-      for (const p of validatedData.products) {
+      const resolved = await resolveOrderProducts(tx, existingOrder.storeId, validatedData.products)
+      for (const p of resolved) {
         await tx.orderProduct.create({
-          data: { orderId: id, name: p.name, quantity: p.quantity, unitPrice: p.unitPrice },
+          data: { orderId: id, name: p.name, quantity: p.quantity, unitPrice: p.unitPrice, productId: p.productId },
         })
       }
       return tx.serviceOrder.findUniqueOrThrow({
@@ -368,6 +374,7 @@ export async function PUT(
     console.error('Erro ao atualizar ordem:', error)
     const mapped = packageErrorResponse(error) ?? equipmentErrorResponse(error)
     if (mapped) return mapped
+    if (error instanceof ProductAccessError) return NextResponse.json({ error: error.message }, { status: 400 })
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
         { error: 'Dados inválidos', details: error },

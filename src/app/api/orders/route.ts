@@ -10,6 +10,8 @@ import { orderServicesInclude, orderProductsInclude, displayServiceName } from '
 import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS } from '@/lib/packages/order-request'
 import { lockAndValidateOrderEquipments } from '@/lib/equipments/lock'
 import { equipmentErrorResponse } from '@/lib/equipments/errors'
+import { orderTotalFor } from '@/lib/vip'
+import { resolveOrderProducts, ProductAccessError } from '@/lib/products/order-products'
 
 // GET /api/orders - Listar ordens de serviço
 export async function GET(request: NextRequest) {
@@ -176,8 +178,9 @@ export async function POST(request: NextRequest) {
     // Gerar número da ordem
     const orderNumber = generateOrderNumber()
 
-    // Calcular total
-    const totalAmount = computeOrderTotal(validatedData.services, validatedData.products)
+    // Calcular total (cliente VIP não paga: total zerado e snapshot na OS)
+    const isVipOrder = client.isVip
+    const totalAmount = orderTotalFor(computeOrderTotal(validatedData.services, validatedData.products), isVipOrder)
 
     // Criar ordem e itens (com consumo de pacote) em uma transação.
     // A OS é relida dentro da transação: um erro nessa leitura não deixa um 500 após o commit.
@@ -190,6 +193,7 @@ export async function POST(request: NextRequest) {
           clientId: validatedData.clientId,
           createdById: user!.id, // Usa o usuário autenticado
           totalAmount,
+          isVipOrder,
           ...(validatedData.createdAt && { createdAt: orderDateFromInput(validatedData.createdAt) }),
         },
         select: { id: true },
@@ -203,10 +207,11 @@ export async function POST(request: NextRequest) {
         clientId: validatedData.clientId,
         items: validatedData.services,
       })
-      for (const p of validatedData.products) {
+      const resolved = await resolveOrderProducts(tx, validatedData.storeId, validatedData.products)
+      for (const p of resolved) {
         // Um a um: a ordem de exibição é createdAt+id, como nos itens de serviço
         await tx.orderProduct.create({
-          data: { orderId: created.id, name: p.name, quantity: p.quantity, unitPrice: p.unitPrice },
+          data: { orderId: created.id, name: p.name, quantity: p.quantity, unitPrice: p.unitPrice, productId: p.productId },
         })
       }
       return tx.serviceOrder.findUniqueOrThrow({
@@ -272,6 +277,7 @@ export async function POST(request: NextRequest) {
     console.error('Erro ao criar ordem:', error)
     const mapped = packageErrorResponse(error) ?? equipmentErrorResponse(error)
     if (mapped) return mapped
+    if (error instanceof ProductAccessError) return NextResponse.json({ error: error.message }, { status: 400 })
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
         { error: 'Dados inválidos', details: error },

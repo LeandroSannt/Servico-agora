@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { clientSchema } from '@/lib/validations'
 import { requireAuth, getCompanyFilter, getStoreFilter } from '@/lib/auth-utils'
 import { getBalancesByClient } from '@/lib/packages/client-packages'
+import { normalizeVipCompanyName } from '@/lib/vip'
 
 // GET /api/clients - Listar clientes
 export async function GET(request: NextRequest) {
@@ -119,7 +120,11 @@ export async function POST(request: NextRequest) {
     }
 
     const client = await prisma.client.create({
-      data: validatedData,
+      data: {
+        ...validatedData,
+        isVip: validatedData.isVip ?? false,
+        vipCompanyName: normalizeVipCompanyName(validatedData.isVip ?? false, validatedData.vipCompanyName),
+      },
       include: {
         store: {
           select: { id: true, name: true },
