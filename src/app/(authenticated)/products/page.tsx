@@ -100,14 +100,14 @@ export default function ProductsPage() {
               <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border py-1 z-20 min-w-[120px]">
                 <button
                   onClick={() => handleEdit(product)}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >
                   <Edit2 className="h-4 w-4" />
                   Editar
                 </button>
                 <button
                   onClick={() => handleToggleActive(product)}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >
                   <Power className="h-4 w-4" />
                   {product.isActive ? 'Desativar' : 'Ativar'}

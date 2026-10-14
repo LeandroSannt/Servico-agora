@@ -127,7 +127,7 @@ export default function ClientsPage() {
                     setEquipmentsFor(client)
                     setOpenActionsId(null)
                   }}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >
                   <Wrench className="h-4 w-4" />
                   Equipamentos
@@ -137,7 +137,7 @@ export default function ClientsPage() {
                     setHistoryFor(client)
                     setOpenActionsId(null)
                   }}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >
                   <History className="h-4 w-4" />
                   Pacotes
@@ -148,7 +148,7 @@ export default function ClientsPage() {
                       setSellFor(client)
                       setOpenActionsId(null)
                     }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                   >
                     <Package className="h-4 w-4" />
                     Vender pacote
@@ -156,7 +156,7 @@ export default function ClientsPage() {
                 )}
                 <button
                   onClick={() => handleEdit(client)}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >
                   <Edit className="h-4 w-4" />
                   Editar
