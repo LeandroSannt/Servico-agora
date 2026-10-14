@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireClientAccess } from '@/lib/equipments/client-access'
-import { parsePhotoDataUrl, MAX_PHOTOS } from '@/lib/equipments/photos'
+import { parsePhotoDataUrl, MAX_PHOTOS, MAX_PHOTO_DATA_URL_LENGTH } from '@/lib/equipments/photos'
 
 type Ctx = { params: Promise<{ id: string; equipmentId: string }> }
 
@@ -11,6 +11,12 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     const { id, equipmentId } = await params
     const access = await requireClientAccess(id, 'adicionar fotos em')
     if (access.error) return access.error
+
+    // Recusa corpos gigantes antes de lê-los (data URL de 800 KB tem ~1,1 MB)
+    const declared = Number(request.headers.get('content-length') ?? 0)
+    if (declared > MAX_PHOTO_DATA_URL_LENGTH + 1024) {
+      return NextResponse.json({ error: 'Imagem acima de 800 KB' }, { status: 413 })
+    }
 
     const body = await request.json().catch(() => null)
     const parsed = parsePhotoDataUrl(body?.dataUrl)

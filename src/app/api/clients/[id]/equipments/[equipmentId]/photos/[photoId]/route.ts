@@ -19,7 +19,10 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
     })
     if (!photo) return notFound()
     return new NextResponse(Buffer.from(photo.data, 'base64'), {
-      headers: { 'Content-Type': photo.mimeType, 'Cache-Control': 'private, max-age=86400' },
+      headers: {
+        'Content-Type': photo.mimeType, 'Cache-Control': 'private, max-age=86400',
+        'X-Content-Type-Options': 'nosniff',
+      },
     })
   } catch (error) {
     console.error('Erro ao ler foto:', error)
