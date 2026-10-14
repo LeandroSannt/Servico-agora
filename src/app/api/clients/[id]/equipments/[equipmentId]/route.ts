@@ -20,17 +20,21 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }, { status: 400 })
     }
     const { tags, ...fields } = parsed.data
-    // Só o equipamento deste cliente (where com clientId evita editar o de outro cliente)
-    const owned = await prisma.equipment.findFirst({ where: { id: equipmentId, clientId: id }, select: { id: true } })
-    if (!owned) return notFound()
-    await prisma.$transaction(async (tx) => {
+    // Só o equipamento deste cliente (o lock filtra por client_id: não edita o de outro cliente)
+    const found = await prisma.$transaction(async (tx) => {
+      // FOR UPDATE serializa PATCHes concorrentes de tags (e o DELETE do equipamento)
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM equipments WHERE id = ${equipmentId} AND client_id = ${id} FOR UPDATE`
+      if (locked.length === 0) return false
       if (Object.keys(fields).length > 0) await tx.equipment.update({ where: { id: equipmentId }, data: fields })
       if (tags !== undefined) {
         // Substitui o conjunto de características
         await tx.equipmentTag.deleteMany({ where: { equipmentId } })
         if (tags.length > 0) await tx.equipmentTag.createMany({ data: tags.map((label) => ({ equipmentId, label })) })
       }
+      return true
     })
+    if (!found) return notFound()
     // Pode ter sido apagado entre a transação e a releitura
     const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId }, include: equipmentInclude })
     if (!equipment) return notFound()
