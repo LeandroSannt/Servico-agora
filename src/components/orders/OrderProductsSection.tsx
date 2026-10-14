@@ -1,6 +1,13 @@
 'use client'
 
-import { useFieldArray, type Control, type FieldErrors, type UseFormRegister, type UseFormWatch } from 'react-hook-form'
+import {
+  useFieldArray,
+  type Control,
+  type FieldErrors,
+  type UseFormRegister,
+  type UseFormSetValue,
+  type UseFormWatch,
+} from 'react-hook-form'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Select, Checkbox } from '@/components/ui'
 import { useProducts } from '@/hooks/api'
@@ -12,12 +19,13 @@ interface Props {
   errors: FieldErrors<ServiceOrderFormData>
   storeId: string
   watch: UseFormWatch<ServiceOrderFormData>
+  setValue: UseFormSetValue<ServiceOrderFormData>
 }
 
 /** Produtos da OS: do catálogo da loja ou avulsos. O total é calculado pelo OrderForm. */
-export default function OrderProductsSection({ control, register, errors, storeId, watch }: Props) {
+export default function OrderProductsSection({ control, register, errors, storeId, watch, setValue }: Props) {
   const { fields, append, remove } = useFieldArray({ control, name: 'products' })
-  const { data: catalogData } = useProducts({ storeId: storeId || undefined, active: true, limit: 100 })
+  const { data: catalogData, isLoading: catalogLoading } = useProducts({ storeId: storeId || undefined, active: true, limit: 100 })
   const catalog = storeId ? catalogData?.data ?? [] : []
   const watched = watch('products')
 
@@ -36,23 +44,13 @@ export default function OrderProductsSection({ control, register, errors, storeI
         </Button>
       </div>
 
-      {catalog.length > 0 && (
-        <div className="mb-4">
-          <Select
-            label="Adicionar produto cadastrado"
-            placeholder="Selecione um produto"
-            value=""
-            options={catalog.map((p) => ({
-              value: p.id,
-              label: `${p.name} - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(p.price))}`,
-            }))}
-            onChange={(e) => {
-              const p = catalog.find((c) => c.id === e.target.value)
-              if (p) append({ name: p.name, quantity: 1, unitPrice: Number(p.price), productId: p.id })
-            }}
-          />
-        </div>
-      )}
+      {!storeId ? (
+        <p className="mb-3 text-xs text-gray-500">Selecione a loja para escolher produtos cadastrados.</p>
+      ) : !catalogLoading && catalog.length === 0 ? (
+        <p className="mb-3 text-xs text-gray-500">
+          Nenhum produto cadastrado nesta loja. Cadastre em Produtos ou marque &quot;Salvar no catálogo&quot; ao digitar um.
+        </p>
+      ) : null}
 
       {fields.length === 0 ? (
         <p className="text-sm text-gray-500">Nenhum produto. Use para itens vendidos junto com a OS.</p>
@@ -60,6 +58,32 @@ export default function OrderProductsSection({ control, register, errors, storeI
         <div className="space-y-3">
           {fields.map((field, index) => (
             <div key={field.id} className="grid grid-cols-12 gap-2 items-start p-3 border rounded-lg bg-gray-50">
+              {catalog.length > 0 && (
+                <div className="col-span-12">
+                  <Select
+                    label="Produto cadastrado"
+                    value={watched?.[index]?.productId ?? ''}
+                    options={[
+                      { value: '', label: 'Avulso (digitar manualmente)' },
+                      ...catalog.map((p) => ({
+                        value: p.id,
+                        label: `${p.name} - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(p.price))}`,
+                      })),
+                    ]}
+                    onChange={(e) => {
+                      const p = catalog.find((c) => c.id === e.target.value)
+                      if (p) {
+                        setValue(`products.${index}.productId`, p.id, { shouldDirty: true })
+                        setValue(`products.${index}.name`, p.name, { shouldDirty: true })
+                        setValue(`products.${index}.unitPrice`, Number(p.price), { shouldDirty: true })
+                        setValue(`products.${index}.saveToCatalog`, false, { shouldDirty: true })
+                      } else {
+                        setValue(`products.${index}.productId`, undefined, { shouldDirty: true })
+                      }
+                    }}
+                  />
+                </div>
+              )}
               <div className="col-span-12 sm:col-span-6">
                 <Input
                   label="Produto"
