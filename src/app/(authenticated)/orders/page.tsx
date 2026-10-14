@@ -249,7 +249,7 @@ export default function OrdersPage() {
                 <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border py-1 z-20 min-w-[140px]">
                   <button
                     onClick={() => handleView(order)}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                   >
                     <Eye className="h-4 w-4" />
                     Visualizar
@@ -257,7 +257,7 @@ export default function OrdersPage() {
                   <button
                     onClick={() => handleEdit(order)}
                     disabled={order.status === 'FINISHED' || order.status === 'PAID'}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Edit2 className="h-4 w-4" />
                     Editar

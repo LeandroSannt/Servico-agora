@@ -3,7 +3,7 @@
 import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useSession } from 'next-auth/react'
-import { Button, Input, Textarea, Select, Checkbox, Modal } from '@/components/ui'
+import { Button, Input, Textarea, Select, SearchSelect, Checkbox, Modal } from '@/components/ui'
 import { serviceOrderSchema, type ServiceOrderFormData, clientSchema, type ClientFormData } from '@/lib/validations'
 import {
   useCreateOrder,
@@ -470,13 +470,24 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
         <div>
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <Select
-                label="Cliente"
-                options={clients.map((c) => ({ value: c.id, label: `${c.name} - ${c.phone}` }))}
-                placeholder={storeId ? 'Selecione o cliente' : 'Selecione a loja primeiro'}
-                error={errors.clientId?.message}
-                disabled={!storeId || !!order}
-                {...register('clientId', { onChange: resetPackageUse })}
+              <Controller
+                name="clientId"
+                control={control}
+                render={({ field }) => (
+                  <SearchSelect
+                    label="Cliente"
+                    options={clients.map((c) => ({ value: c.id, label: `${c.name} - ${c.phone}` }))}
+                    placeholder={storeId ? 'Selecione o cliente' : 'Selecione a loja primeiro'}
+                    searchPlaceholder="Pesquisar por nome ou telefone…"
+                    error={errors.clientId?.message}
+                    disabled={!storeId || !!order}
+                    value={field.value ?? ''}
+                    onChange={(v) => {
+                      field.onChange(v)
+                      resetPackageUse()
+                    }}
+                  />
+                )}
               />
             </div>
             {!order && storeId && (
@@ -579,17 +590,19 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
               {showNewService !== index && !watchedServices[index]?.serviceName ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-2">
-                    <Select
+                    <SearchSelect
                       label="Selecionar Serviço"
+                      placeholder="Escolha um serviço"
+                      searchPlaceholder="Pesquisar serviço…"
+                      value=""
                       options={[
-                        { value: '', label: 'Escolha um serviço' },
                         ...services.map((s) => ({
                           value: s.id,
                           label: `${s.name} - ${formatCurrency(s.price)}`,
                         })),
-                        { value: 'new', label: '+ Cadastrar novo serviço' },
+                        { value: 'new', label: '+ Cadastrar novo serviço', pinned: true },
                       ]}
-                      onChange={(e) => handleServiceSelect(index, e.target.value)}
+                      onChange={(v) => handleServiceSelect(index, v)}
                       error={errors.services?.[index]?.serviceName?.message}
                     />
                   </div>
