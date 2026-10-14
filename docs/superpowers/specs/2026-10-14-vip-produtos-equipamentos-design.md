@@ -62,7 +62,7 @@ OrderProduct.productId String? -> Product (onDelete: SetNull)
 
 - `EquipmentPicker` ganha botão "Novo equipamento" abrindo mini-formulário (`QuickEquipmentForm`): nome (obrigatório), marca, modelo, série, cor, características, fotos.
 - Cliente já existente: `POST /api/clients/[id]/equipments` e seleção automática do novo equipamento.
-- Cliente novo na mesma OS (cadastro rápido de cliente existente): equipamentos ficam pendentes no estado do formulário; ao submeter, cria-se o cliente, depois os equipamentos, depois a OS com os ids reais. Em falha parcial, o erro é mostrado e o que já foi criado é reaproveitado no retry (ids guardados no estado).
+- Cliente novo: o cadastro rápido de cliente da OS já grava o cliente na hora e o seleciona; portanto o botão "Novo equipamento" funciona logo em seguida, sem estado pendente.
 - Mesmo formulário reutilizado em `ClientEquipmentsModal` (um único componente de campos).
 
 ## 4. Características do equipamento
@@ -83,7 +83,7 @@ OrderProduct.productId String? -> Product (onDelete: SetNull)
 
 ## Migração e compatibilidade
 
-- Uma migration Prisma aditiva: colunas com default, tabelas novas, sem backfill necessário (`isVip=false`, `isVipOrder=false`).
+- Mudança aditiva de schema aplicada pelo fluxo do projeto (`prisma db push --config prisma/prisma.config.ts`; não há migrations versionadas): colunas com default, tabelas novas, sem backfill necessário (`isVip=false`, `isVipOrder=false`).
 - Todas as FKs novas seguem a regra do projeto (Cascade; `SetNull` apenas em `OrderProduct.productId` para preservar histórico).
 - Rodar Prisma com `--config` conforme ambiente local (ver memória do projeto).
 
@@ -101,4 +101,4 @@ Quatro PRs a partir de `origin/main`, nesta ordem, para revisão incremental:
 3. Equipamento: características e fotos.
 4. Cadastro rápido de equipamento (e cliente novo) na OS.
 
-Cada PR traz sua própria migration.
+Cada PR traz sua própria mudança de schema.
