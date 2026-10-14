@@ -9,7 +9,7 @@ import {
   type UseFormWatch,
 } from 'react-hook-form'
 import { Plus, Trash2 } from 'lucide-react'
-import { Button, Input, Select, Checkbox } from '@/components/ui'
+import { Button, Input, SearchSelect, Checkbox } from '@/components/ui'
 import { useProducts } from '@/hooks/api'
 import type { ServiceOrderFormData } from '@/lib/validations'
 
@@ -60,18 +60,20 @@ export default function OrderProductsSection({ control, register, errors, storeI
             <div key={field.id} className="grid grid-cols-12 gap-2 items-start p-3 border rounded-lg bg-gray-50">
               {catalog.length > 0 && (
                 <div className="col-span-12">
-                  <Select
+                  <SearchSelect
                     label="Produto cadastrado"
+                    placeholder="Avulso (digitar manualmente)"
+                    searchPlaceholder="Pesquisar produto…"
                     value={watched?.[index]?.productId ?? ''}
                     options={[
-                      { value: '', label: 'Avulso (digitar manualmente)' },
+                      { value: 'none', label: 'Avulso (digitar manualmente)', pinned: true },
                       ...catalog.map((p) => ({
                         value: p.id,
                         label: `${p.name} - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(p.price))}`,
                       })),
                     ]}
-                    onChange={(e) => {
-                      const p = catalog.find((c) => c.id === e.target.value)
+                    onChange={(id) => {
+                      const p = catalog.find((c) => c.id === id)
                       if (p) {
                         setValue(`products.${index}.productId`, p.id, { shouldDirty: true })
                         setValue(`products.${index}.name`, p.name, { shouldDirty: true })

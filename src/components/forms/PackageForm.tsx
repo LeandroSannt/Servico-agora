@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { useSession } from 'next-auth/react'
 import { Store } from 'lucide-react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Button, Input, Textarea, Select } from '@/components/ui'
+import { Button, Input, Textarea, Select, SearchSelect } from '@/components/ui'
 import { servicePackageSchema, type ServicePackageFormData } from '@/lib/validations'
 import { useCreatePackage, useUpdatePackage, useStores, useServices, type ServicePackage } from '@/hooks/api'
 import { formatCurrency } from '@/lib/utils'
@@ -32,6 +32,7 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
     register,
     handleSubmit,
     watch,
+    control,
     setValue,
     setError,
     formState: { errors, isSubmitted },
@@ -145,14 +146,22 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
               {...register('storeId', { onChange: () => setValue('serviceId', '') })}
             />
           )}
-          <Select
-            id="pkg-service"
-            label="Serviço"
-            options={services.map((s) => ({ value: s.id, label: `${s.name} — ${formatCurrency(Number(s.price))}` }))}
-            placeholder={storeId ? 'Selecione o serviço' : 'Selecione a loja primeiro'}
-            disabled={!storeId}
-            error={errors.serviceId?.message}
-            {...register('serviceId')}
+          <Controller
+            name="serviceId"
+            control={control}
+            render={({ field }) => (
+              <SearchSelect
+                id="pkg-service"
+                label="Serviço"
+                options={services.map((s) => ({ value: s.id, label: `${s.name} — ${formatCurrency(Number(s.price))}` }))}
+                placeholder={storeId ? 'Selecione o serviço' : 'Selecione a loja primeiro'}
+                searchPlaceholder="Pesquisar serviço…"
+                disabled={!storeId}
+                error={errors.serviceId?.message}
+                value={field.value ?? ''}
+                onChange={field.onChange}
+              />
+            )}
           />
         </div>
       )}
