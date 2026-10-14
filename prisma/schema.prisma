@@ -266,9 +266,36 @@ model Equipment {
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   orderServices OrderServiceEquipment[]
+  tags          EquipmentTag[]
+  photos        EquipmentPhoto[]
 
   @@index([clientId])
   @@map("equipments")
+}
+
+// Característica livre do equipamento (ex.: "Inverter", "220V")
+model EquipmentTag {
+  id          String    @id @default(cuid())
+  label       String
+  equipmentId String    @map("equipment_id")
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([equipmentId, label])
+  @@map("equipment_tags")
+}
+
+// Foto do equipamento (base64 sem prefixo, já redimensionada no cliente)
+model EquipmentPhoto {
+  id          String    @id @default(cuid())
+  data        String    @db.Text
+  mimeType    String    @map("mime_type")
+  sizeBytes   Int       @map("size_bytes")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  equipmentId String    @map("equipment_id")
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([equipmentId])
+  @@map("equipment_photos")
 }
 
 // Equipamentos de cada linha de serviço da OS. Cascade nos dois lados (regra do projeto);
