@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { productSchema } from '@/lib/validations'
-import { requireAuth, getCompanyFilter, getStoreFilter } from '@/lib/auth-utils'
+import { requireAuth } from '@/lib/auth-utils'
+import { productScopeWhere } from '@/lib/products/scope'
 
 // GET /api/products - Listar produtos
 export async function GET(request: NextRequest) {
@@ -15,25 +16,9 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
 
-    // Construir filtro baseado no role do usuário
-    const storeFilter = getStoreFilter(user!)
-    const where: Record<string, unknown> = { ...storeFilter }
+    const where: Record<string, unknown> = productScopeWhere(user!, storeId)
 
-    // Se SUPER_ADMIN ou COMPANY_ADMIN, filtra por company
-    if (['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(user!.role)) {
-      const companyFilter = getCompanyFilter(user!)
-      if (companyFilter.companyId) {
-        where.store = { companyId: companyFilter.companyId }
-      }
-    }
-
-    if (storeId) {
-      if (user!.role === 'SUPER_ADMIN' || user!.role === 'COMPANY_ADMIN' || user!.storeId === storeId) {
-        where.storeId = storeId
-      }
-    }
-
-    if (searchParams.get('active') === '1') where.isActive = true
+    if (['1', 'true'].includes(searchParams.get('active') ?? '')) where.isActive = true
 
     if (search) {
       where.OR = [
@@ -112,7 +97,7 @@ export async function POST(request: NextRequest) {
     }
 
     const product = await prisma.product.create({
-      data: validatedData,
+      data: { ...validatedData, description: validatedData.description || null },
       include: {
         store: {
           select: { id: true, name: true },

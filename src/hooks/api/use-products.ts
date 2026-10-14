@@ -38,7 +38,7 @@ export function useProducts(params: UseProductsParams = {}) {
     queryKey: ['products', { search, storeId, active, page, limit }],
     queryFn: async () => {
       const { data } = await axios.get('/api/products', {
-        params: { search, storeId, active, page, limit },
+        params: { search, storeId, active: active ? 1 : undefined, page, limit },
       })
       return data
     },

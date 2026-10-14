@@ -60,7 +60,10 @@ export async function PUT(
 
     const product = await prisma.product.update({
       where: { id },
-      data: validatedData,
+      data: {
+        ...validatedData,
+        ...(validatedData.description !== undefined && { description: validatedData.description || null }),
+      },
       include: { store: { select: { id: true, name: true } } },
     })
 
