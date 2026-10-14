@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { Plus, Search, Users, Edit, Trash2, Phone, Mail, MoreVertical, Package, History, Wrench } from 'lucide-react'
-import { Button, Input, Badge, EmptyState, Modal } from '@/components/ui'
+import { Button, Input, Badge, EmptyState, Modal, Pagination } from '@/components/ui'
+import { usePageState, useClampPage } from '@/hooks/use-pagination'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import ClientForm from '@/components/forms/ClientForm'
@@ -32,8 +33,11 @@ interface Client {
   balances?: { serviceId: string; serviceName: string; remaining: number }[]
 }
 
+const PAGE_SIZE = 20
+
 export default function ClientsPage() {
   const [search, setSearch] = useState('')
+  const [page, setPage] = usePageState(search)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [openActionsId, setOpenActionsId] = useState<string | null>(null)
@@ -55,10 +59,12 @@ export default function ClientsPage() {
     }
   }
 
-  const { data: clientsData, isLoading: loading } = useClients({ search, limit: 50 })
+  const { data: clientsData, isLoading: loading } = useClients({ search, page, limit: PAGE_SIZE })
   const deleteMutation = useDeleteClient()
 
   const clients = clientsData?.data || []
+  const pagination = clientsData?.pagination
+  useClampPage(page, pagination?.totalPages, setPage)
 
   const handleEdit = (client: Client) => {
     setSelectedClient(client)
@@ -373,6 +379,14 @@ export default function ClientsPage() {
               </Table>
             </CardContent>
           </Card>
+          <Pagination
+            page={page}
+            totalPages={pagination?.totalPages ?? 1}
+            total={pagination?.total ?? 0}
+            limit={PAGE_SIZE}
+            onPageChange={setPage}
+            itemLabel="clientes"
+          />
         </>
       )}
 

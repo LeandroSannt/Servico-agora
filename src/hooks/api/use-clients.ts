@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import axios from 'axios'
 import type { ClientFormData } from '@/lib/validations'
 
@@ -46,6 +46,7 @@ export function useClients(params: UseClientsParams = {}) {
 
   return useQuery<ClientsResponse>({
     queryKey: ['clients', { search, storeId, page, limit }],
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const { data } = await axios.get('/api/clients', {
         params: { search, storeId, page, limit },

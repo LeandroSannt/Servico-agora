@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { Search, Plus, Edit2, Trash2, DollarSign, MoreVertical } from 'lucide-react'
-import { Button, Input, Modal, Badge, EmptyState } from '@/components/ui'
+import { Button, Input, Modal, Badge, EmptyState, Pagination } from '@/components/ui'
+import { usePageState, useClampPage } from '@/hooks/use-pagination'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui'
 import ServiceForm from '@/components/forms/ServiceForm'
 import { useServices, useDeleteService } from '@/hooks/api'
@@ -17,17 +18,22 @@ interface Service {
   createdAt: string
 }
 
+const PAGE_SIZE = 20
+
 export default function ServicesPage() {
   const [search, setSearch] = useState('')
+  const [page, setPage] = usePageState(search)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedService, setSelectedService] = useState<Service | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [openActionsId, setOpenActionsId] = useState<string | null>(null)
 
-  const { data: servicesData, isLoading } = useServices({ search, limit: 50 })
+  const { data: servicesData, isLoading } = useServices({ search, page, limit: PAGE_SIZE })
   const deleteMutation = useDeleteService()
 
   const services = servicesData?.data || []
+  const pagination = servicesData?.pagination
+  useClampPage(page, pagination?.totalPages, setPage)
 
   const handleCreate = () => {
     setSelectedService(null)
@@ -226,6 +232,14 @@ export default function ServicesPage() {
               </TableBody>
             </Table>
           </div>
+          <Pagination
+            page={page}
+            totalPages={pagination?.totalPages ?? 1}
+            total={pagination?.total ?? 0}
+            limit={PAGE_SIZE}
+            onPageChange={setPage}
+            itemLabel="serviços"
+          />
         </>
       )}
 
