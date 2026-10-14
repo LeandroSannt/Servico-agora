@@ -119,6 +119,10 @@ model Client {
   phone     String
   document  String?  // CPF ou CNPJ
 
+  // VIP: não paga serviços; fora dos gráficos financeiros
+  isVip          Boolean @default(false) @map("is_vip")
+  vipCompanyName String? @map("vip_company_name")
+
   // Endereço
   address   String?
   city      String?
@@ -174,6 +178,9 @@ model ServiceOrder {
 
   // Valores
   totalAmount Decimal @default(0) @db.Decimal(10, 2) @map("total_amount")
+
+  // Snapshot do VIP do cliente ao criar a OS; total gravado = 0 e fora da receita
+  isVipOrder  Boolean @default(false) @map("is_vip_order")
 
   // Datas
   createdAt   DateTime  @default(now()) @map("created_at")
