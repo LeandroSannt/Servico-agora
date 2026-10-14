@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Pencil, Trash2, RotateCcw, Plus } from 'lucide-react'
-import { Modal, Button, Input, Textarea, Badge } from '@/components/ui'
+import { Modal, Button, Badge } from '@/components/ui'
 import {
   useClientEquipments,
   useCreateEquipment,
@@ -12,8 +12,7 @@ import {
   equipmentPhotoUrl,
   type Equipment,
 } from '@/hooks/api'
-import TagInput from './TagInput'
-import EquipmentPhotos from './EquipmentPhotos'
+import EquipmentFields, { EMPTY_EQUIPMENT_FORM as EMPTY, type EquipmentFormState as FormState } from './EquipmentFields'
 import { equipmentSchema } from '@/lib/validations'
 
 interface Props {
@@ -28,9 +27,6 @@ export default function ClientEquipmentsModal({ client, onClose }: Props) {
     </Modal>
   )
 }
-
-const EMPTY = { name: '', brand: '', model: '', serialNumber: '', color: '', notes: '' }
-type FormState = typeof EMPTY
 
 const errorMessage = (e: unknown, fallback: string) =>
   (e as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback
@@ -128,7 +124,6 @@ function Content({ clientId }: { clientId: string }) {
     }
   }
 
-  const set = (k: keyof FormState) => (ev: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: ev.target.value }))
   const saving = create.isPending || update.isPending || uploadPhoto.isPending
   const busy = remove.isPending || update.isPending
 
@@ -168,22 +163,18 @@ function Content({ clientId }: { clientId: string }) {
       {editing !== null && (
         <div className="p-4 border rounded-lg bg-gray-50 space-y-3">
           {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-          <Input label="Nome *" placeholder="Ex.: Split sala" value={form.name} onChange={set('name')} />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="Marca" value={form.brand} onChange={set('brand')} />
-            <Input label="Modelo" value={form.model} onChange={set('model')} />
-            <Input label="Nº de série" value={form.serialNumber} onChange={set('serialNumber')} />
-            <Input label="Cor" placeholder="Ex.: Branco" value={form.color} onChange={set('color')} />
-          </div>
-          <Textarea label="Observações" value={form.notes} onChange={set('notes')} />
-          <TagInput value={tags} onChange={setTags} disabled={saving} />
-          <EquipmentPhotos
+          <EquipmentFields
             clientId={clientId}
-            equipmentId={editing !== 'new' ? editing : undefined}
-            pending={pendingPhotos}
-            onPendingChange={setPendingPhotos}
-            onBusyChange={setPhotosBusy}
+            form={form}
+            onFormChange={setForm}
+            tags={tags}
+            onTagsChange={setTags}
+            equipmentId={editing !== 'new' ? editing ?? undefined : undefined}
             photos={equipments.find((x) => x.id === editing)?.photos ?? []}
+            pendingPhotos={pendingPhotos}
+            onPendingPhotosChange={setPendingPhotos}
+            onPhotosBusyChange={setPhotosBusy}
+            disabled={saving}
           />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={saving || photosBusy}>

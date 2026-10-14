@@ -1,6 +1,6 @@
 'use client'
 
-import { Wrench } from 'lucide-react'
+import { Wrench, Plus } from 'lucide-react'
 import type { Equipment } from '@/hooks/api'
 
 interface Props {
@@ -12,10 +12,12 @@ interface Props {
   loading?: boolean
   /** Ids vinculados à OS ao abrir: continuam visíveis (mesmo arquivados) depois de desmarcados. */
   initialIds?: string[]
+  /** Abre o cadastro rápido de equipamento (só com cliente selecionado). */
+  onCreateNew?: () => void
 }
 
 /** Checkboxes dos equipamentos do cliente para uma linha de serviço da OS. */
-export default function EquipmentPicker({ equipments, value, onChange, hasClient, loading, initialIds = [] }: Props) {
+export default function EquipmentPicker({ equipments, value, onChange, hasClient, loading, initialIds = [], onCreateNew }: Props) {
   const selected = new Set(value)
   const initial = new Set(initialIds)
   const options = equipments.filter((e) => e.isActive || selected.has(e.id) || initial.has(e.id))
@@ -53,6 +55,16 @@ export default function EquipmentPicker({ equipments, value, onChange, hasClient
             </label>
           ))}
         </div>
+      )}
+      {hasClient && !loading && onCreateNew && (
+        <button
+          type="button"
+          onClick={onCreateNew}
+          className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"
+        >
+          <Plus className="w-4 h-4" />
+          Novo equipamento
+        </button>
       )}
     </div>
   )
