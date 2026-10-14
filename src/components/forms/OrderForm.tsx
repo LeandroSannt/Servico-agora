@@ -72,9 +72,10 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
   const [quickEquipmentFor, setQuickEquipmentFor] = useState<number | null>(null)
   const [newClientError, setNewClientError] = useState<string | null>(null)
 
-  // Loja fixa quando editando ou quando o usuário tem loja vinculada;
-  // caso contrário o usuário escolhe a loja num select.
-  const isStoreReadOnly = !!order || !!userStore
+  // Loja fixa quando editando ou quando o usuário (gerente/funcionário) tem loja vinculada;
+  // admins (geral e da empresa) sempre escolhem a loja num select, com a própria como padrão.
+  const canPickStore = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(session?.user?.role || '')
+  const isStoreReadOnly = !!order || (!!userStore && !canPickStore)
   const initialStoreId = order?.store?.id || userStore?.id || ''
   const storeName = order?.store?.name || userStore?.name || ''
 

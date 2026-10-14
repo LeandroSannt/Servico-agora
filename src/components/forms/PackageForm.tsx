@@ -23,6 +23,7 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
   const [nameTouched, setNameTouched] = useState(!!pkg)
   const { data: session } = useSession()
   const userStore = session?.user?.store
+  const canPickStore = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(session?.user?.role || '')
   const initialStoreId = pkg?.store.id || userStore?.id || ''
 
   const { data: storesData } = useStores({ limit: 100 })
@@ -124,7 +125,7 @@ export default function PackageForm({ pkg, onSuccess, onCancel }: PackageFormPro
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {userStore ? (
+          {userStore && !canPickStore ? (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Loja</label>
               <div className="flex items-center gap-2 h-10 px-3 bg-gray-100 border border-gray-300 rounded-lg">
