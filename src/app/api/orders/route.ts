@@ -10,6 +10,7 @@ import { orderServicesInclude, orderProductsInclude, displayServiceName } from '
 import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS } from '@/lib/packages/order-request'
 import { lockAndValidateOrderEquipments } from '@/lib/equipments/lock'
 import { equipmentErrorResponse } from '@/lib/equipments/errors'
+import { orderTotalFor } from '@/lib/vip'
 
 // GET /api/orders - Listar ordens de serviço
 export async function GET(request: NextRequest) {
@@ -176,8 +177,9 @@ export async function POST(request: NextRequest) {
     // Gerar número da ordem
     const orderNumber = generateOrderNumber()
 
-    // Calcular total
-    const totalAmount = computeOrderTotal(validatedData.services, validatedData.products)
+    // Calcular total (cliente VIP não paga: total zerado e snapshot na OS)
+    const isVipOrder = client.isVip
+    const totalAmount = orderTotalFor(computeOrderTotal(validatedData.services, validatedData.products), isVipOrder)
 
     // Criar ordem e itens (com consumo de pacote) em uma transação.
     // A OS é relida dentro da transação: um erro nessa leitura não deixa um 500 após o commit.
@@ -190,6 +192,7 @@ export async function POST(request: NextRequest) {
           clientId: validatedData.clientId,
           createdById: user!.id, // Usa o usuário autenticado
           totalAmount,
+          isVipOrder,
           ...(validatedData.createdAt && { createdAt: orderDateFromInput(validatedData.createdAt) }),
         },
         select: { id: true },

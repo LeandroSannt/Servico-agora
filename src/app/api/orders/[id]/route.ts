@@ -11,6 +11,7 @@ import { orderServicesInclude, orderProductsInclude, displayServiceName } from '
 import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS } from '@/lib/packages/order-request'
 import { lockAndValidateOrderEquipments } from '@/lib/equipments/lock'
 import { equipmentErrorResponse } from '@/lib/equipments/errors'
+import { orderTotalFor } from '@/lib/vip'
 
 // GET /api/orders/[id] - Buscar ordem por ID
 export async function GET(
@@ -286,8 +287,11 @@ export async function PUT(
       )
     }
 
-    // Calcular novo total
-    const totalAmount = computeOrderTotal(validatedData.services, validatedData.products)
+    // Calcular novo total (preserva o snapshot VIP da OS: total zerado)
+    const totalAmount = orderTotalFor(
+      computeOrderTotal(validatedData.services, validatedData.products),
+      existingOrder.isVipOrder
+    )
 
     // Atualizar ordem em uma transação. A ordem importa:
     // (a) o update da OS vem PRIMEIRO e trava a linha da ordem: um PUT concorrente da mesma OS
