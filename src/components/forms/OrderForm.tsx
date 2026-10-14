@@ -50,7 +50,7 @@ interface OrderFormProps {
       service?: { price: number | string } | null
       equipments?: { equipment: { id: string; name: string; isActive: boolean } }[]
     }[]
-    products?: { id: string; name: string; quantity: number; unitPrice: number | string }[]
+    products?: { id: string; name: string; quantity: number; unitPrice: number | string; productId?: string | null }[]
   } | null
   onSuccess: () => void
   onCancel: () => void
@@ -114,7 +114,12 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       services: order?.services
         ? regroupOrderItems(order.services, catalogPriceFromItems(order.services))
         : [emptyServiceItem],
-      products: (order?.products ?? []).map((p) => ({ name: p.name, quantity: p.quantity, unitPrice: Number(p.unitPrice) })),
+      products: (order?.products ?? []).map((p) => ({
+        name: p.name,
+        quantity: p.quantity,
+        unitPrice: Number(p.unitPrice),
+        productId: p.productId ?? undefined,
+      })),
     },
   })
 
@@ -390,6 +395,8 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
           name: p.name,
           quantity: Number(p.quantity) || 1,
           unitPrice: Number(p.unitPrice) || 0,
+          productId: p.productId || undefined,
+          saveToCatalog: p.productId ? undefined : p.saveToCatalog === true,
         })),
       }
 
@@ -775,7 +782,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
         )}
       </div>
 
-      <OrderProductsSection control={control} register={register} errors={errors} />
+      <OrderProductsSection control={control} register={register} errors={errors} storeId={storeId} watch={watch} />
 
       {/* Total */}
       <div className="border-t pt-4 space-y-1">
