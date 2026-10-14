@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Modal, Button } from '@/components/ui'
 import { useCreateEquipment, useUploadEquipmentPhoto, type Equipment } from '@/hooks/api'
 import EquipmentFields, { EMPTY_EQUIPMENT_FORM, type EquipmentFormState } from '@/components/equipments/EquipmentFields'
@@ -17,14 +17,21 @@ const errorMessage = (e: unknown, fallback: string) =>
   (e as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback
 
 export default function QuickEquipmentModal({ open, clientId, onClose, onCreated }: Props) {
+  // true enquanto salva ou processa foto: fechar (X, ESC, fundo) fica inerte
+  const lockedRef = useRef(false)
   return (
-    <Modal isOpen={open} onClose={onClose} title="Novo equipamento" size="lg">
-      {open && <Content key={clientId} clientId={clientId} onClose={onClose} onCreated={onCreated} />}
+    <Modal isOpen={open} onClose={() => !lockedRef.current && onClose()} title="Novo equipamento" size="lg">
+      {open && <Content key={clientId} clientId={clientId} lockedRef={lockedRef} onClose={onClose} onCreated={onCreated} />}
     </Modal>
   )
 }
 
-function Content({ clientId, onClose, onCreated }: Omit<Props, 'open'>) {
+function Content({
+  clientId,
+  lockedRef,
+  onClose,
+  onCreated,
+}: Omit<Props, 'open'> & { lockedRef: { current: boolean } }) {
   const create = useCreateEquipment(clientId)
   const uploadPhoto = useUploadEquipmentPhoto(clientId)
   const [form, setForm] = useState<EquipmentFormState>(EMPTY_EQUIPMENT_FORM)
@@ -36,9 +43,16 @@ function Content({ clientId, onClose, onCreated }: Omit<Props, 'open'>) {
   const [partial, setPartial] = useState<{ equipment: Equipment; failures: number } | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  useEffect(() => {
+    lockedRef.current = submitting || photosBusy
+  }, [lockedRef, submitting, photosBusy])
+  useEffect(() => () => {
+    lockedRef.current = false
+  }, [lockedRef])
+
   const save = async () => {
     if (submitting) return
-    const parsed = equipmentSchema.safeParse(form)
+    const parsed = equipmentSchema.safeParse({ ...form, tags })
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
       return
@@ -46,7 +60,7 @@ function Content({ clientId, onClose, onCreated }: Omit<Props, 'open'>) {
     setError(null)
     setSubmitting(true)
     try {
-      const created = await create.mutateAsync({ ...form, tags })
+      const created = await create.mutateAsync(parsed.data)
       let failures = 0
       for (const dataUrl of pendingPhotos) {
         try {

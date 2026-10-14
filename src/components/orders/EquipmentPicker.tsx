@@ -35,9 +35,9 @@ export default function EquipmentPicker({ equipments, value, onChange, hasClient
         <p className="text-xs text-gray-500">Selecione o cliente para escolher equipamentos.</p>
       ) : loading ? (
         <p className="text-xs text-gray-500">Carregando equipamentos…</p>
-      ) : options.length === 0 && !onCreateNew ? (
+      ) : options.length === 0 ? (
         <p className="text-xs text-gray-500">Nenhum equipamento cadastrado para este cliente.</p>
-      ) : options.length === 0 ? null : (
+      ) : (
         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
           {options.map((e) => (
             <label key={e.id} className="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">

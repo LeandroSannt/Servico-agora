@@ -838,7 +838,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
           onCreated={(equipment) => {
             if (quickEquipmentFor !== null) {
               const current = getValues(`services.${quickEquipmentFor}.equipmentIds`) ?? []
-              setValue(`services.${quickEquipmentFor}.equipmentIds`, [...current, equipment.id], { shouldDirty: true })
+              setValue(`services.${quickEquipmentFor}.equipmentIds`, current.includes(equipment.id) ? current : [...current, equipment.id], { shouldDirty: true })
             }
             setQuickEquipmentFor(null)
           }}

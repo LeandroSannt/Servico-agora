@@ -57,6 +57,7 @@ export default function EquipmentFields({
         onPendingChange={onPendingPhotosChange}
         onBusyChange={onPhotosBusyChange}
         photos={photos}
+        disabled={disabled}
       />
     </>
   )
