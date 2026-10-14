@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { Search, Plus, Edit2, Trash2, ShoppingBag, MoreVertical, Power } from 'lucide-react'
-import { Button, Input, Modal, Badge, EmptyState } from '@/components/ui'
+import { Button, Input, Modal, Badge, EmptyState, Pagination } from '@/components/ui'
+import { usePageState, useClampPage } from '@/hooks/use-pagination'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui'
 import ProductForm from '@/components/forms/ProductForm'
 import { useProducts, useDeleteProduct, useUpdateProduct } from '@/hooks/api'
@@ -17,18 +18,23 @@ interface Product {
   createdAt: string
 }
 
+const PAGE_SIZE = 20
+
 export default function ProductsPage() {
   const [search, setSearch] = useState('')
+  const [page, setPage] = usePageState(search)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [openActionsId, setOpenActionsId] = useState<string | null>(null)
 
-  const { data: productsData, isLoading } = useProducts({ search, limit: 50 })
+  const { data: productsData, isLoading } = useProducts({ search, page, limit: PAGE_SIZE })
   const deleteMutation = useDeleteProduct()
   const updateMutation = useUpdateProduct()
 
   const products = productsData?.data || []
+  const pagination = productsData?.pagination
+  useClampPage(page, pagination?.totalPages, setPage)
 
   const handleCreate = () => {
     setSelectedProduct(null)
@@ -253,6 +259,14 @@ export default function ProductsPage() {
               </TableBody>
             </Table>
           </div>
+          <Pagination
+            page={page}
+            totalPages={pagination?.totalPages ?? 1}
+            total={pagination?.total ?? 0}
+            limit={PAGE_SIZE}
+            onPageChange={setPage}
+            itemLabel="produtos"
+          />
         </>
       )}
 

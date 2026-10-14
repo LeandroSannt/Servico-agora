@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import axios from 'axios'
 import type { ServiceOrderFormData } from '@/lib/validations'
 
@@ -58,6 +58,7 @@ export function useOrders(params: UseOrdersParams = {}) {
 
   return useQuery<OrdersResponse>({
     queryKey: ['orders', { search, status, storeId, companyId, clientId, startDate, endDate, page, limit }],
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const { data } = await axios.get('/api/orders', {
         params: { search, status, storeId, companyId, clientId, startDate, endDate, page, limit },

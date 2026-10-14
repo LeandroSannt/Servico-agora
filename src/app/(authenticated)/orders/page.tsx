@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { Search, Plus, Edit2, Trash2, Eye, ClipboardList, Play, CheckCircle, ArrowRight, Calendar, X, DollarSign, Inbox, Pause, MoreVertical, Wrench } from 'lucide-react'
-import { Button, Input, Modal, Badge, EmptyState, Select, Textarea } from '@/components/ui'
+import { Button, Input, Modal, Badge, EmptyState, Select, Textarea, Pagination } from '@/components/ui'
+import { usePageState, useClampPage } from '@/hooks/use-pagination'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui'
 import OrderForm from '@/components/forms/OrderForm'
 import { useOrders, useDeleteOrder, useUpdateOrderStatus } from '@/hooks/api'
@@ -101,6 +102,8 @@ function getDateRange(period: string): { startDate?: string; endDate?: string } 
   }
 }
 
+const PAGE_SIZE = 20
+
 export default function OrdersPage() {
   const [search, setSearch] = useState('')
   useEffect(() => {
@@ -112,6 +115,9 @@ export default function OrdersPage() {
   const [periodFilter, setPeriodFilter] = useState('')
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
+  const [page, setPage] = usePageState(
+    JSON.stringify([search, statusFilter, scope, periodFilter, customStartDate, customEndDate])
+  )
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [viewOrder, setViewOrder] = useState<Order | null>(null)
@@ -135,12 +141,15 @@ export default function OrdersPage() {
     storeId: scope.storeId || undefined,
     startDate: dateFilters.startDate,
     endDate: dateFilters.endDate,
-    limit: 50,
+    page,
+    limit: PAGE_SIZE,
   })
   const deleteMutation = useDeleteOrder()
   const updateStatusMutation = useUpdateOrderStatus()
 
   const orders = ordersData?.data || []
+  const pagination = ordersData?.pagination
+  useClampPage(page, pagination?.totalPages, setPage)
 
   const handleCreate = () => {
     setSelectedOrder(null)
@@ -563,6 +572,14 @@ export default function OrdersPage() {
               </TableBody>
             </Table>
           </div>
+          <Pagination
+            page={page}
+            totalPages={pagination?.totalPages ?? 1}
+            total={pagination?.total ?? 0}
+            limit={PAGE_SIZE}
+            onPageChange={setPage}
+            itemLabel="ordens de serviço"
+          />
         </>
       )}
 
