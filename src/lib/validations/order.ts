@@ -17,7 +17,7 @@ export const orderServiceSchema = z.object({
     .optional(),
 })
 
-// Produto avulso (sem catálogo), digitado na OS
+// Produto da OS: avulso ou do catálogo (productId)
 export const orderProductSchema = z.object({
   name: z.string().trim().min(1, 'Nome do produto é obrigatório'),
   quantity: z.coerce
@@ -29,6 +29,8 @@ export const orderProductSchema = z.object({
     .number({ error: 'Informe o preço' })
     .min(0, 'Preço deve ser maior ou igual a zero')
     .transform((v) => Math.round(v * 100) / 100),
+  productId: z.string().min(1).optional(),
+  saveToCatalog: z.boolean().optional(),
 })
 
 export const serviceOrderSchema = z

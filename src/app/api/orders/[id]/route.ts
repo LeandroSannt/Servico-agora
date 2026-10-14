@@ -12,6 +12,7 @@ import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS
 import { lockAndValidateOrderEquipments } from '@/lib/equipments/lock'
 import { equipmentErrorResponse } from '@/lib/equipments/errors'
 import { orderTotalFor } from '@/lib/vip'
+import { resolveOrderProducts, ProductAccessError } from '@/lib/products/order-products'
 
 // GET /api/orders/[id] - Buscar ordem por ID
 export async function GET(
@@ -328,9 +329,10 @@ export async function PUT(
         items: validatedData.services,
       })
       await tx.orderProduct.deleteMany({ where: { orderId: id } })
-      for (const p of validatedData.products) {
+      const resolved = await resolveOrderProducts(tx, existingOrder.storeId, validatedData.products)
+      for (const p of resolved) {
         await tx.orderProduct.create({
-          data: { orderId: id, name: p.name, quantity: p.quantity, unitPrice: p.unitPrice },
+          data: { orderId: id, name: p.name, quantity: p.quantity, unitPrice: p.unitPrice, productId: p.productId },
         })
       }
       return tx.serviceOrder.findUniqueOrThrow({
@@ -372,6 +374,7 @@ export async function PUT(
     console.error('Erro ao atualizar ordem:', error)
     const mapped = packageErrorResponse(error) ?? equipmentErrorResponse(error)
     if (mapped) return mapped
+    if (error instanceof ProductAccessError) return NextResponse.json({ error: error.message }, { status: 400 })
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
         { error: 'Dados inválidos', details: error },

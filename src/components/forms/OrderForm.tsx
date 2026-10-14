@@ -16,6 +16,7 @@ import {
   useClientEquipments,
 } from '@/hooks/api'
 import EquipmentPicker from '@/components/orders/EquipmentPicker'
+import QuickEquipmentModal from '@/components/orders/QuickEquipmentModal'
 import OrderProductsSection from '@/components/orders/OrderProductsSection'
 import { regroupOrderItems, catalogPriceFromItems } from '@/lib/packages/regroup'
 import {
@@ -50,7 +51,7 @@ interface OrderFormProps {
       service?: { price: number | string } | null
       equipments?: { equipment: { id: string; name: string; isActive: boolean } }[]
     }[]
-    products?: { id: string; name: string; quantity: number; unitPrice: number | string }[]
+    products?: { id: string; name: string; quantity: number; unitPrice: number | string; productId?: string | null }[]
   } | null
   onSuccess: () => void
   onCancel: () => void
@@ -68,6 +69,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
 
   const [showNewService, setShowNewService] = useState<number | null>(null)
   const [showNewClientModal, setShowNewClientModal] = useState(false)
+  const [quickEquipmentFor, setQuickEquipmentFor] = useState<number | null>(null)
   const [newClientError, setNewClientError] = useState<string | null>(null)
 
   // Loja fixa quando editando ou quando o usuário tem loja vinculada;
@@ -114,7 +116,12 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
       services: order?.services
         ? regroupOrderItems(order.services, catalogPriceFromItems(order.services))
         : [emptyServiceItem],
-      products: (order?.products ?? []).map((p) => ({ name: p.name, quantity: p.quantity, unitPrice: Number(p.unitPrice) })),
+      products: (order?.products ?? []).map((p) => ({
+        name: p.name,
+        quantity: p.quantity,
+        unitPrice: Number(p.unitPrice),
+        productId: p.productId ?? undefined,
+      })),
     },
   })
 
@@ -390,6 +397,8 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
           name: p.name,
           quantity: Number(p.quantity) || 1,
           unitPrice: Number(p.unitPrice) || 0,
+          productId: p.productId || undefined,
+          saveToCatalog: p.productId ? undefined : p.saveToCatalog === true,
         })),
       }
 
@@ -761,6 +770,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                     value={f.value ?? []}
                     onChange={f.onChange}
                     hasClient={!!clientId}
+                    onCreateNew={() => setQuickEquipmentFor(index)}
                     initialIds={initialEquipmentIds.current}
                     loading={equipmentsLoading || equipmentsArePlaceholder}
                   />
@@ -775,7 +785,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
         )}
       </div>
 
-      <OrderProductsSection control={control} register={register} errors={errors} />
+      <OrderProductsSection control={control} register={register} errors={errors} storeId={storeId} watch={watch} />
 
       {/* Total */}
       <div className="border-t pt-4 space-y-1">
@@ -818,6 +828,22 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
               : 'Criar Ordem de Serviço'}
         </Button>
       </div>
+
+      {/* Modal Novo Equipamento (cadastro rápido) */}
+      {clientId && (
+        <QuickEquipmentModal
+          open={quickEquipmentFor !== null}
+          clientId={clientId}
+          onClose={() => setQuickEquipmentFor(null)}
+          onCreated={(equipment) => {
+            if (quickEquipmentFor !== null) {
+              const current = getValues(`services.${quickEquipmentFor}.equipmentIds`) ?? []
+              setValue(`services.${quickEquipmentFor}.equipmentIds`, current.includes(equipment.id) ? current : [...current, equipment.id], { shouldDirty: true })
+            }
+            setQuickEquipmentFor(null)
+          }}
+        />
+      )}
 
       {/* Modal Novo Cliente */}
       <Modal
