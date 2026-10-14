@@ -45,7 +45,10 @@ export default function EquipmentPicker({ equipments, value, onChange, hasClient
                 checked={selected.has(e.id)}
                 onChange={(ev) => toggle(e.id, ev.target.checked)}
               />
-              {e.name}
+              <span>
+                {e.name}
+                {e.tags.length > 0 && <span className="ml-1.5 text-xs text-gray-500">{e.tags.join(' · ')}</span>}
+              </span>
               {!e.isActive && <span className="text-xs text-gray-500">(arquivado)</span>}
             </label>
           ))}

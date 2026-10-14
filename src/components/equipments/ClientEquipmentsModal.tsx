@@ -8,8 +8,12 @@ import {
   useCreateEquipment,
   useUpdateEquipment,
   useDeleteEquipment,
+  useUploadEquipmentPhoto,
+  equipmentPhotoUrl,
   type Equipment,
 } from '@/hooks/api'
+import TagInput from './TagInput'
+import EquipmentPhotos from './EquipmentPhotos'
 import { equipmentSchema } from '@/lib/validations'
 
 interface Props {
@@ -37,10 +41,14 @@ function Content({ clientId }: { clientId: string }) {
   const create = useCreateEquipment(clientId)
   const update = useUpdateEquipment(clientId)
   const remove = useDeleteEquipment(clientId)
+  const uploadPhoto = useUploadEquipmentPhoto(clientId)
 
   // editing: null = formulário fechado; 'new' = cadastrando; id = editando
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY)
+  const [tags, setTags] = useState<string[]>([])
+  // Fotos escolhidas ao cadastrar (enviadas após o POST do equipamento)
+  const [pendingPhotos, setPendingPhotos] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [notice, setNoticeState] = useState<{ text: string; tone: 'info' | 'error' } | null>(null)
   const setNotice = (text: string | null, tone: 'info' | 'error' = 'info') =>
@@ -48,6 +56,8 @@ function Content({ clientId }: { clientId: string }) {
 
   const openNew = () => {
     setForm(EMPTY)
+    setTags([])
+    setPendingPhotos([])
     setEditing('new')
     setError(null)
   }
@@ -60,6 +70,8 @@ function Content({ clientId }: { clientId: string }) {
       color: e.color ?? '',
       notes: e.notes ?? '',
     })
+    setTags(e.tags)
+    setPendingPhotos([])
     setEditing(e.id)
     setError(null)
   }
@@ -71,10 +83,22 @@ function Content({ clientId }: { clientId: string }) {
       return
     }
     try {
-      if (editing === 'new') await create.mutateAsync(form)
-      else if (editing) await update.mutateAsync({ id: editing, data: form })
+      let photoFailures = 0
+      if (editing === 'new') {
+        const created = await create.mutateAsync({ ...form, tags })
+        for (const dataUrl of pendingPhotos) {
+          try {
+            await uploadPhoto.mutateAsync({ equipmentId: created.id, dataUrl })
+          } catch {
+            photoFailures++
+          }
+        }
+      } else if (editing) await update.mutateAsync({ id: editing, data: { ...form, tags } })
       setEditing(null)
-      setNotice(null)
+      setPendingPhotos([])
+      if (photoFailures > 0) {
+        setNotice(`Equipamento salvo, mas ${photoFailures} foto(s) não foram enviadas. Edite o equipamento para tentar de novo.`, 'error')
+      } else setNotice(null)
     } catch (e) {
       setError(errorMessage(e, 'Erro ao salvar equipamento'))
     }
@@ -104,7 +128,7 @@ function Content({ clientId }: { clientId: string }) {
   }
 
   const set = (k: keyof FormState) => (ev: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: ev.target.value }))
-  const saving = create.isPending || update.isPending
+  const saving = create.isPending || update.isPending || uploadPhoto.isPending
   const busy = remove.isPending || update.isPending
 
   return (
@@ -151,6 +175,14 @@ function Content({ clientId }: { clientId: string }) {
             <Input label="Cor" placeholder="Ex.: Branco" value={form.color} onChange={set('color')} />
           </div>
           <Textarea label="Observações" value={form.notes} onChange={set('notes')} />
+          <TagInput value={tags} onChange={setTags} disabled={saving} />
+          <EquipmentPhotos
+            clientId={clientId}
+            equipmentId={editing !== 'new' ? editing : undefined}
+            pending={pendingPhotos}
+            onPendingChange={setPendingPhotos}
+            photos={equipments.find((x) => x.id === editing)?.photos ?? []}
+          />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={saving}>
               Cancelar
@@ -190,6 +222,28 @@ function Content({ clientId }: { clientId: string }) {
                   {[e.brand, e.model, e.color].filter(Boolean).join(' · ') || '—'}
                   {e.serialNumber ? ` · Série ${e.serialNumber}` : ''}
                 </p>
+                {e.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {e.tags.map((t) => (
+                      <span key={t} className="rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-xs text-blue-800">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {e.photos.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {e.photos.map((p) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={p.id}
+                        src={equipmentPhotoUrl(clientId, e.id, p.id)}
+                        alt={`Foto de ${e.name}`}
+                        className="h-10 w-10 rounded border object-cover"
+                      />
+                    ))}
+                  </div>
+                )}
                 {e.notes && <p className="text-xs text-gray-500 mt-0.5">{e.notes}</p>}
               </div>
               <div className="flex shrink-0 gap-1">
