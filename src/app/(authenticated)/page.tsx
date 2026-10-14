@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ClipboardList, Users, Clock, CheckCircle, Play, Plus, DollarSign, Calendar, Inbox, Pause } from 'lucide-react'
 import { Button, Badge, Select } from '@/components/ui'
 import { useDashboardStats, useDashboardCharts, useOrders } from '@/hooks/api'
+import ScopeFilter, { type ScopeValue } from '@/components/layout/ScopeFilter'
 import {
   ChartCard,
   OrdersByStatusChart,
@@ -65,18 +66,23 @@ function getDateRange(period: string): { startDate?: string; endDate?: string } 
 
 export default function Dashboard() {
   const [periodFilter, setPeriodFilter] = useState('')
+  const [scope, setScope] = useState<ScopeValue>({ companyId: '', storeId: '' })
   const [timeMeasure, setTimeMeasure] = useState<TimeMeasure>('count')
 
   const dateFilters = useMemo(() => getDateRange(periodFilter), [periodFilter])
 
+  const scopeParams = { companyId: scope.companyId || undefined, storeId: scope.storeId || undefined }
+
   const { data: stats, isLoading: statsLoading } = useDashboardStats({
     startDate: dateFilters.startDate,
     endDate: dateFilters.endDate,
+    ...scopeParams,
   })
   const { data: ordersData, isLoading: ordersLoading } = useOrders({
     limit: 5,
     startDate: dateFilters.startDate,
     endDate: dateFilters.endDate,
+    ...scopeParams,
   })
 
   const {
@@ -86,6 +92,7 @@ export default function Dashboard() {
   } = useDashboardCharts({
     startDate: dateFilters.startDate,
     endDate: dateFilters.endDate,
+    ...scopeParams,
   })
 
   const recentOrders = ordersData?.data || []
@@ -178,7 +185,9 @@ export default function Dashboard() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-sm sm:text-base text-gray-600 mt-0.5 sm:mt-1">Visão geral do sistema</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <ScopeFilter value={scope} onChange={setScope} />
+          <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-gray-500 hidden sm:block" />
           <Select
             options={PERIOD_OPTIONS}
@@ -186,6 +195,7 @@ export default function Dashboard() {
             onChange={(e) => setPeriodFilter(e.target.value)}
             className="w-full sm:w-48"
           />
+          </div>
         </div>
       </div>
 

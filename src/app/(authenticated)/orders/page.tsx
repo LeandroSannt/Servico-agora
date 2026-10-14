@@ -6,6 +6,7 @@ import { Button, Input, Modal, Badge, EmptyState, Select, Textarea } from '@/com
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui'
 import OrderForm from '@/components/forms/OrderForm'
 import { useOrders, useDeleteOrder, useUpdateOrderStatus } from '@/hooks/api'
+import ScopeFilter, { type ScopeValue } from '@/components/layout/ScopeFilter'
 import { orderEquipmentNames, summarizeNames } from '@/lib/equipments/order-equipments'
 
 interface OrderService {
@@ -107,6 +108,7 @@ export default function OrdersPage() {
     if (q) setSearch(q)
   }, [])
   const [statusFilter, setStatusFilter] = useState('')
+  const [scope, setScope] = useState<ScopeValue>({ companyId: '', storeId: '' })
   const [periodFilter, setPeriodFilter] = useState('')
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
@@ -129,6 +131,8 @@ export default function OrdersPage() {
   const { data: ordersData, isLoading } = useOrders({
     search: search || undefined,
     status: statusFilter || undefined,
+    companyId: scope.companyId || undefined,
+    storeId: scope.storeId || undefined,
     startDate: dateFilters.startDate,
     endDate: dateFilters.endDate,
     limit: 50,
@@ -328,6 +332,7 @@ export default function OrdersPage() {
               className="pl-10"
             />
           </div>
+          <ScopeFilter value={scope} onChange={setScope} />
           <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-4">
             <Select
               options={STATUS_OPTIONS}

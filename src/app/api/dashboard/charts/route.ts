@@ -64,7 +64,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const startParam = searchParams.get('startDate')
     const endParam = searchParams.get('endDate')
-    const { orderWhere, clientWhere } = getDashboardScope(user!)
+    const { orderWhere, clientWhere } = getDashboardScope(user!, {
+      companyId: searchParams.get('companyId'),
+      storeId: searchParams.get('storeId'),
+    })
 
     // Resolver intervalo e granularidade
     const now = new Date()

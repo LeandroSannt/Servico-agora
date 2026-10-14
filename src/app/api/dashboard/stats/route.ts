@@ -14,7 +14,10 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
-    const { orderWhere: scopeWhere, clientWhere } = getDashboardScope(user!)
+    const { orderWhere: scopeWhere, clientWhere } = getDashboardScope(user!, {
+      companyId: searchParams.get('companyId'),
+      storeId: searchParams.get('storeId'),
+    })
 
     // Filtro por período
     const dateFilter: { gte?: Date; lt?: Date } = {}
