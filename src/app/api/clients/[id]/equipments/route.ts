@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { equipmentSchema } from '@/lib/validations'
 import { requireClientAccess } from '@/lib/equipments/client-access'
+import { equipmentInclude, serializeEquipment } from '@/lib/equipments/serialize'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -16,8 +17,9 @@ export async function GET(request: NextRequest, { params }: Ctx) {
     const equipments = await prisma.equipment.findMany({
       where: { clientId: id, ...(includeArchived ? {} : { isActive: true }) },
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
+      include: equipmentInclude,
     })
-    return NextResponse.json(equipments)
+    return NextResponse.json(equipments.map(serializeEquipment))
   } catch (error) {
     console.error('Erro ao listar equipamentos:', error)
     return NextResponse.json({ error: 'Erro ao listar equipamentos' }, { status: 500 })
@@ -35,8 +37,12 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }, { status: 400 })
     }
-    const created = await prisma.equipment.create({ data: { ...parsed.data, clientId: id } })
-    return NextResponse.json(created, { status: 201 })
+    const { tags = [], ...fields } = parsed.data
+    const created = await prisma.equipment.create({
+      data: { ...fields, clientId: id, tags: { create: tags.map((label) => ({ label })) } },
+      include: equipmentInclude,
+    })
+    return NextResponse.json(serializeEquipment(created), { status: 201 })
   } catch (error) {
     console.error('Erro ao cadastrar equipamento:', error)
     return NextResponse.json({ error: 'Erro ao cadastrar equipamento' }, { status: 500 })

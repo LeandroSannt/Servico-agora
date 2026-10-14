@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { normalizeTags, MAX_TAGS, MAX_TAG_LENGTH } from '@/lib/equipments/tags'
 
 // Texto opcional: string vazia/espaços vira null (coluna nullable)
 const optionalText = z
@@ -7,6 +8,13 @@ const optionalText = z
   .nullish()
   .transform((v) => (v ? v : null))
 
+// Ausente = não altera (PATCH) / sem características (POST); presente = substitui o conjunto
+const tagsField = z
+  .array(z.string().max(MAX_TAG_LENGTH, 'Característica muito longa'))
+  .max(MAX_TAGS * 2, 'Características demais')
+  .optional()
+  .transform((t) => (t ? normalizeTags(t) : undefined))
+
 export const equipmentSchema = z.object({
   name: z.string().trim().min(1, 'Nome do equipamento é obrigatório'),
   brand: optionalText,
@@ -14,6 +22,7 @@ export const equipmentSchema = z.object({
   serialNumber: optionalText,
   color: optionalText,
   notes: optionalText,
+  tags: tagsField,
 })
 
 // PATCH: chave ausente fica ausente (não apaga o campo). Não reutilizar optionalText aqui:
@@ -33,6 +42,7 @@ export const updateEquipmentSchema = z.object({
   color: patchText,
   notes: patchText,
   isActive: z.boolean().optional(),
+  tags: tagsField,
 })
 
 export type EquipmentInput = z.input<typeof equipmentSchema>

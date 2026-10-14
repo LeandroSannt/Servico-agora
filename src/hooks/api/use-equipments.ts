@@ -12,6 +12,8 @@ export interface Equipment {
   notes: string | null
   isActive: boolean
   clientId: string
+  tags: string[]
+  photos: { id: string }[]
 }
 
 export function useClientEquipments(clientId: string | null | undefined, opts: { includeArchived?: boolean } = {}) {
@@ -53,6 +55,29 @@ export function useDeleteEquipment(clientId: string) {
   return useMutation({
     mutationFn: async (id: string) =>
       (await axios.delete(`/api/clients/${clientId}/equipments/${id}`)).data as { archived: boolean },
+    onSuccess: invalidate,
+  })
+}
+
+/** URL da imagem da foto (GET binário; usar como src). */
+export function equipmentPhotoUrl(clientId: string, equipmentId: string, photoId: string) {
+  return `/api/clients/${clientId}/equipments/${equipmentId}/photos/${photoId}`
+}
+
+export function useUploadEquipmentPhoto(clientId: string) {
+  const invalidate = useInvalidate(clientId)
+  return useMutation({
+    mutationFn: async ({ equipmentId, dataUrl }: { equipmentId: string; dataUrl: string }) =>
+      (await axios.post(`/api/clients/${clientId}/equipments/${equipmentId}/photos`, { dataUrl })).data as { id: string },
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteEquipmentPhoto(clientId: string) {
+  const invalidate = useInvalidate(clientId)
+  return useMutation({
+    mutationFn: async ({ equipmentId, photoId }: { equipmentId: string; photoId: string }) =>
+      (await axios.delete(`/api/clients/${clientId}/equipments/${equipmentId}/photos/${photoId}`)).data as { ok: true },
     onSuccess: invalidate,
   })
 }
