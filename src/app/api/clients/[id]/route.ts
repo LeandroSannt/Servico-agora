@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { clientSchema } from '@/lib/validations'
+import { normalizeVipCompanyName } from '@/lib/vip'
 
 // GET /api/clients/[id] - Buscar cliente por ID
 export async function GET(
@@ -65,9 +66,18 @@ export async function PUT(
       )
     }
 
+    // Nome da empresa só existe para VIP; ao desmarcar VIP é limpo
+    const { isVip: vipInput, vipCompanyName: vipNameInput, ...rest } = validatedData
+    const vipData: { isVip?: boolean; vipCompanyName?: string | null } = {}
+    if (vipInput !== undefined || vipNameInput !== undefined) {
+      const isVip = vipInput ?? existingClient.isVip
+      vipData.isVip = isVip
+      vipData.vipCompanyName = normalizeVipCompanyName(isVip, vipNameInput ?? existingClient.vipCompanyName)
+    }
+
     const client = await prisma.client.update({
       where: { id },
-      data: validatedData,
+      data: { ...rest, ...vipData },
       include: {
         store: {
           select: { id: true, name: true },

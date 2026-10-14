@@ -11,6 +11,8 @@ export const clientSchema = z.object({
   zipCode: z.string().optional(),
   notes: z.string().optional(),
   storeId: z.string().min(1, 'Loja é obrigatória'),
+  isVip: z.boolean().optional(),
+  vipCompanyName: z.string().trim().max(120, 'Máximo de 120 caracteres').optional().or(z.literal('')),
 })
 
 export type ClientFormData = z.infer<typeof clientSchema>
