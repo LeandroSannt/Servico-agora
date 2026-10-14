@@ -785,7 +785,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
         )}
       </div>
 
-      <OrderProductsSection control={control} register={register} errors={errors} storeId={storeId} watch={watch} />
+      <OrderProductsSection control={control} register={register} errors={errors} storeId={storeId} watch={watch} setValue={setValue} />
 
       {/* Total */}
       <div className="border-t pt-4 space-y-1">
