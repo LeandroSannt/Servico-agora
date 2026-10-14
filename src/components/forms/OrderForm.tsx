@@ -16,6 +16,7 @@ import {
   useClientEquipments,
 } from '@/hooks/api'
 import EquipmentPicker from '@/components/orders/EquipmentPicker'
+import QuickEquipmentModal from '@/components/orders/QuickEquipmentModal'
 import OrderProductsSection from '@/components/orders/OrderProductsSection'
 import { regroupOrderItems, catalogPriceFromItems } from '@/lib/packages/regroup'
 import {
@@ -68,6 +69,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
 
   const [showNewService, setShowNewService] = useState<number | null>(null)
   const [showNewClientModal, setShowNewClientModal] = useState(false)
+  const [quickEquipmentFor, setQuickEquipmentFor] = useState<number | null>(null)
   const [newClientError, setNewClientError] = useState<string | null>(null)
 
   // Loja fixa quando editando ou quando o usuário tem loja vinculada;
@@ -768,6 +770,7 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
                     value={f.value ?? []}
                     onChange={f.onChange}
                     hasClient={!!clientId}
+                    onCreateNew={() => setQuickEquipmentFor(index)}
                     initialIds={initialEquipmentIds.current}
                     loading={equipmentsLoading || equipmentsArePlaceholder}
                   />
@@ -825,6 +828,22 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
               : 'Criar Ordem de Serviço'}
         </Button>
       </div>
+
+      {/* Modal Novo Equipamento (cadastro rápido) */}
+      {clientId && (
+        <QuickEquipmentModal
+          open={quickEquipmentFor !== null}
+          clientId={clientId}
+          onClose={() => setQuickEquipmentFor(null)}
+          onCreated={(equipment) => {
+            if (quickEquipmentFor !== null) {
+              const current = getValues(`services.${quickEquipmentFor}.equipmentIds`) ?? []
+              setValue(`services.${quickEquipmentFor}.equipmentIds`, [...current, equipment.id], { shouldDirty: true })
+            }
+            setQuickEquipmentFor(null)
+          }}
+        />
+      )}
 
       {/* Modal Novo Cliente */}
       <Modal
