@@ -48,6 +48,7 @@ function Content({ clientId }: { clientId: string }) {
   const [form, setForm] = useState<FormState>(EMPTY)
   const [tags, setTags] = useState<string[]>([])
   // Fotos escolhidas ao cadastrar (enviadas após o POST do equipamento)
+  const [photosBusy, setPhotosBusy] = useState(false)
   const [pendingPhotos, setPendingPhotos] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [notice, setNoticeState] = useState<{ text: string; tone: 'info' | 'error' } | null>(null)
@@ -181,13 +182,14 @@ function Content({ clientId }: { clientId: string }) {
             equipmentId={editing !== 'new' ? editing : undefined}
             pending={pendingPhotos}
             onPendingChange={setPendingPhotos}
+            onBusyChange={setPhotosBusy}
             photos={equipments.find((x) => x.id === editing)?.photos ?? []}
           />
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={saving}>
+            <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={saving || photosBusy}>
               Cancelar
             </Button>
-            <Button type="button" onClick={save} isLoading={saving}>
+            <Button type="button" onClick={save} isLoading={saving} disabled={photosBusy}>
               Salvar
             </Button>
           </div>

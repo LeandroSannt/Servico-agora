@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ImagePlus, X } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { ACCEPTED_LOGO_TYPES, MAX_SOURCE_BYTES, resizeImageToDataUrl } from '@/lib/image-resize'
@@ -15,13 +15,15 @@ interface Props {
   pending: string[]
   onPendingChange: (dataUrls: string[]) => void
   photos: { id: string }[]
+  /** Avisa quando há foto sendo processada, enviada ou removida (para travar Salvar/Cancelar). */
+  onBusyChange?: (busy: boolean) => void
 }
 
 const errorMessage = (e: unknown, fallback: string) =>
   (e as { response?: { data?: { error?: string } } })?.response?.data?.error ||
   (e instanceof Error ? e.message : fallback)
 
-export default function EquipmentPhotos({ clientId, equipmentId, pending, onPendingChange, photos }: Props) {
+export default function EquipmentPhotos({ clientId, equipmentId, pending, onPendingChange, photos, onBusyChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
@@ -31,6 +33,12 @@ export default function EquipmentPhotos({ clientId, equipmentId, pending, onPend
   const total = equipmentId ? photos.length : pending.length
   const atLimit = total >= MAX_PHOTOS
   const busy = processing || upload.isPending || del.isPending
+
+  useEffect(() => {
+    onBusyChange?.(busy)
+  }, [busy, onBusyChange])
+  // Ao fechar o formulário com operação em curso, libera o travamento
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange])
 
   const onFile = async (file: File | undefined) => {
     if (inputRef.current) inputRef.current.value = ''
