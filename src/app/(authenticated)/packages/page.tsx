@@ -18,6 +18,7 @@ export default function PackagesPage() {
 
   const { data: session } = useSession()
   const userStore = session?.user?.store
+  const canPickStore = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(session?.user?.role || '')
   const canManage = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'].includes(session?.user?.role || '')
   const [storeFilter, setStoreFilter] = useState('')
 
@@ -158,7 +159,7 @@ export default function PackagesPage() {
             className="pl-10"
           />
         </div>
-        {!userStore && (
+        {(!userStore || canPickStore) && (
           <div className="w-full sm:w-56">
             <Select
               aria-label="Filtrar por loja"
