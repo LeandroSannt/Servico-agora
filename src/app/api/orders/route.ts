@@ -11,6 +11,7 @@ import { packageUsageInputError, packageErrorResponse, ORDER_TRANSACTION_OPTIONS
 import { lockAndValidateOrderEquipments } from '@/lib/equipments/lock'
 import { equipmentErrorResponse } from '@/lib/equipments/errors'
 import { orderTotalFor } from '@/lib/vip'
+import { resolveOrderProducts, ProductAccessError } from '@/lib/products/order-products'
 
 // GET /api/orders - Listar ordens de serviço
 export async function GET(request: NextRequest) {
@@ -206,10 +207,11 @@ export async function POST(request: NextRequest) {
         clientId: validatedData.clientId,
         items: validatedData.services,
       })
-      for (const p of validatedData.products) {
+      const resolved = await resolveOrderProducts(tx, validatedData.storeId, validatedData.products)
+      for (const p of resolved) {
         // Um a um: a ordem de exibição é createdAt+id, como nos itens de serviço
         await tx.orderProduct.create({
-          data: { orderId: created.id, name: p.name, quantity: p.quantity, unitPrice: p.unitPrice },
+          data: { orderId: created.id, name: p.name, quantity: p.quantity, unitPrice: p.unitPrice, productId: p.productId },
         })
       }
       return tx.serviceOrder.findUniqueOrThrow({
@@ -275,6 +277,7 @@ export async function POST(request: NextRequest) {
     console.error('Erro ao criar ordem:', error)
     const mapped = packageErrorResponse(error) ?? equipmentErrorResponse(error)
     if (mapped) return mapped
+    if (error instanceof ProductAccessError) return NextResponse.json({ error: error.message }, { status: 400 })
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
         { error: 'Dados inválidos', details: error },
