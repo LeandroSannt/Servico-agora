@@ -2,7 +2,7 @@
 
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Button, Input, Select, Textarea } from '@/components/ui'
+import { Button, Checkbox, Input, Select, Textarea } from '@/components/ui'
 import { clientSchema, type ClientFormData } from '@/lib/validations'
 import { useCreateClient, useUpdateClient, useStores } from '@/hooks/api'
 import { useEffect } from 'react'
@@ -19,6 +19,8 @@ interface ClientFormProps {
     state: string | null
     zipCode: string | null
     notes: string | null
+    isVip?: boolean
+    vipCompanyName?: string | null
     store: { id: string; name: string }
   } | null
   onSuccess: () => void
@@ -36,6 +38,7 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
 
   const {
     register,
+    watch,
     handleSubmit,
     formState: { errors },
     setError,
@@ -52,8 +55,12 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
       zipCode: client?.zipCode || '',
       notes: client?.notes || '',
       storeId: client?.store?.id || '',
+      isVip: client?.isVip ?? false,
+      vipCompanyName: client?.vipCompanyName || '',
     },
   })
+
+  const isVip = watch('isVip')
 
   // Handle mutation errors
   useEffect(() => {
@@ -154,6 +161,19 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
             {...register('state')}
           />
         </div>
+      </div>
+
+      {/* VIP */}
+      <div className="border-t pt-4 space-y-4">
+        <Checkbox id="client-is-vip" label="Cliente VIP" {...register('isVip')} />
+        {isVip && (
+          <Input
+            label="Nome da empresa"
+            placeholder="Empresa do cliente VIP"
+            error={errors.vipCompanyName?.message}
+            {...register('vipCompanyName')}
+          />
+        )}
       </div>
 
       <Textarea

@@ -36,6 +36,7 @@ interface OrderFormProps {
     createdAt?: string
     status: string
     totalAmount: number
+    isVipOrder?: boolean
     client: { id: string; name: string }
     store: { id: string; name: string }
     services: {
@@ -226,6 +227,11 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
   // Fetch clients and services using React Query (filtrados pela loja do form)
   const { data: clientsData, isSuccess: clientsLoaded } = useClients({ storeId: storeId, limit: 100 })
   const clients = clientsData?.data || []
+
+  // OS VIP tem total zerado: na edição vale o snapshot da OS; na criação, o cliente selecionado
+  const isVipOrder = order
+    ? !!order.isVipOrder
+    : !!clients.find((c) => c.id === clientId)?.isVip
 
   const { data: servicesData } = useServices({ storeId: storeId, limit: 100 })
   const services = servicesData?.data || []
@@ -785,9 +791,12 @@ export default function OrderForm({ order, onSuccess, onCancel }: OrderFormProps
             </div>
           </>
         )}
+        {isVipOrder && (
+          <p className="text-sm text-amber-700">Cliente VIP: o total da OS será R$ 0,00</p>
+        )}
         <div className="flex justify-between items-center text-lg font-bold">
           <span className="text-gray-900">Total:</span>
-          <span className="text-green-600">{formatCurrency(servicesTotal() + productsTotal())}</span>
+          <span className="text-green-600">{formatCurrency(isVipOrder ? 0 : servicesTotal() + productsTotal())}</span>
         </div>
       </div>
 
