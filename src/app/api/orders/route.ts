@@ -44,9 +44,15 @@ export async function GET(request: NextRequest) {
       where.status = status
     }
 
-    // Se filtrar por loja específica, sobrescreve o filtro de store
+    // Filtro de empresa: só o SUPER_ADMIN (os demais já ficam na própria empresa)
+    const companyId = searchParams.get('companyId')
+    if (companyId && user!.role === 'SUPER_ADMIN') {
+      where.store = { companyId }
+    }
+
+    // Loja específica: combinada com o filtro de empresa acima (não o substitui)
     if (storeId) {
-      where.store = { id: storeId }
+      where.storeId = storeId
     }
 
     if (clientId) {

@@ -45,6 +45,7 @@ interface UseOrdersParams {
   search?: string
   status?: string
   storeId?: string
+  companyId?: string
   clientId?: string
   startDate?: string
   endDate?: string
@@ -53,13 +54,13 @@ interface UseOrdersParams {
 }
 
 export function useOrders(params: UseOrdersParams = {}) {
-  const { search = '', status, storeId, clientId, startDate, endDate, page = 1, limit = 10 } = params
+  const { search = '', status, storeId, companyId, clientId, startDate, endDate, page = 1, limit = 10 } = params
 
   return useQuery<OrdersResponse>({
-    queryKey: ['orders', { search, status, storeId, clientId, startDate, endDate, page, limit }],
+    queryKey: ['orders', { search, status, storeId, companyId, clientId, startDate, endDate, page, limit }],
     queryFn: async () => {
       const { data } = await axios.get('/api/orders', {
-        params: { search, status, storeId, clientId, startDate, endDate, page, limit },
+        params: { search, status, storeId, companyId, clientId, startDate, endDate, page, limit },
       })
       return data
     },

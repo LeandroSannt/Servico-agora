@@ -17,16 +17,18 @@ export interface DashboardStats {
 interface UseDashboardStatsParams {
   startDate?: string
   endDate?: string
+  companyId?: string
+  storeId?: string
 }
 
 export function useDashboardStats(params: UseDashboardStatsParams = {}) {
-  const { startDate, endDate } = params
+  const { startDate, endDate, companyId, storeId } = params
 
   return useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats', { startDate, endDate }],
+    queryKey: ['dashboard-stats', { startDate, endDate, companyId, storeId }],
     queryFn: async () => {
       const { data } = await axios.get('/api/dashboard/stats', {
-        params: { startDate, endDate },
+        params: { startDate, endDate, companyId, storeId },
       })
       return data
     },
@@ -44,13 +46,13 @@ export interface DashboardCharts {
 }
 
 export function useDashboardCharts(params: UseDashboardStatsParams = {}) {
-  const { startDate, endDate } = params
+  const { startDate, endDate, companyId, storeId } = params
 
   return useQuery<DashboardCharts>({
-    queryKey: ['dashboard-charts', { startDate, endDate }],
+    queryKey: ['dashboard-charts', { startDate, endDate, companyId, storeId }],
     queryFn: async () => {
       const { data } = await axios.get('/api/dashboard/charts', {
-        params: { startDate, endDate },
+        params: { startDate, endDate, companyId, storeId },
       })
       return data
     },
