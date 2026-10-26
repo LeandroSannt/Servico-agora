@@ -214,107 +214,91 @@ export default function OrdersPage() {
     })
   }
 
-  const formatDateShort = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-    })
+  const advanceStatus = (order: Order) => {
+    const next = NEXT_STATUS[order.status]
+    if (!next) return
+    if (next.status === 'PAUSED') {
+      setStatusChangeOrder(order)
+    } else {
+      handleStatusChange(order.id, next.status)
+    }
   }
 
-  // Mobile card view for orders
-  const OrderCard = ({ order }: { order: Order }) => {
-    const statusConfig = STATUS_CONFIG[order.status]
-    const StatusIcon = statusConfig.icon
+  // Menu de ações da linha (⋮). Fica fora do clique da linha: o <td> que o contém
+  // interrompe a propagação para não abrir o detalhe junto.
+  const OrderActions = ({ order }: { order: Order }) => {
+    const next = NEXT_STATUS[order.status]
+    const isOpen = openActionsId === order.id
+    const item =
+      'w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed'
 
     return (
-      <div className="bg-white rounded-lg shadow-sm border p-4 space-y-3">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm font-semibold text-gray-800">#{order.orderNumber}</span>
-              <Badge variant={statusConfig.variant} className="text-xs">
-                <StatusIcon className="h-3 w-3 mr-1" />
-                {statusConfig.label}
-              </Badge>
-            </div>
-            <p className="font-medium text-gray-900 mt-1 truncate">{order.client.name}</p>
-            <p className="text-xs text-gray-500">{order.client.phone}</p>
-            {orderEquipmentNames(order.services).length > 0 && (
-              <p className="flex items-center gap-1 text-xs text-gray-600 mt-0.5 truncate">
-                <Wrench className="h-3 w-3 shrink-0" />
-                {summarizeNames(orderEquipmentNames(order.services))}
-              </p>
-            )}
-          </div>
-          <div className="relative">
-            <button
-              onClick={() => setOpenActionsId(openActionsId === order.id ? null : order.id)}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
-              <MoreVertical className="h-5 w-5 text-gray-500" />
-            </button>
-            {openActionsId === order.id && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setOpenActionsId(null)}
-                />
-                <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border py-1 z-20 min-w-[140px]">
-                  <button
-                    onClick={() => handleView(order)}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                  >
-                    <Eye className="h-4 w-4" />
-                    Visualizar
-                  </button>
-                  <button
-                    onClick={() => handleEdit(order)}
-                    disabled={order.status === 'FINISHED' || order.status === 'PAID'}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setDeleteConfirm(order.id)
-                      setOpenActionsId(null)
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Excluir
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between pt-2 border-t">
-          <div>
-            <p className="text-xs text-gray-500">{formatDateShort(order.createdAt)}</p>
-            <p className="font-semibold text-green-600">{formatCurrency(order.totalAmount)}</p>
-          </div>
-          {NEXT_STATUS[order.status] && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (NEXT_STATUS[order.status]!.status === 'PAUSED') {
+      <div className="relative inline-block">
+        <button
+          type="button"
+          onClick={() => setOpenActionsId(isOpen ? null : order.id)}
+          className="p-2 hover:bg-gray-100 rounded-lg"
+          aria-label={`Ações da OS #${order.orderNumber}`}
+          aria-expanded={isOpen}
+        >
+          <MoreVertical className="h-5 w-5 text-gray-500" />
+        </button>
+        {isOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setOpenActionsId(null)} />
+            <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border py-1 z-20 min-w-[160px]">
+              <button type="button" onClick={() => handleView(order)} className={item}>
+                <Eye className="h-4 w-4" />
+                Visualizar
+              </button>
+              {next && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenActionsId(null)
+                    advanceStatus(order)
+                  }}
+                  disabled={updateStatusMutation.isPending}
+                  className={item}
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  {next.label}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenActionsId(null)
                   setStatusChangeOrder(order)
-                } else {
-                  handleStatusChange(order.id, NEXT_STATUS[order.status]!.status)
-                }
-              }}
-              disabled={updateStatusMutation.isPending}
-              className="text-xs"
-            >
-              <ArrowRight className="h-3 w-3 mr-1" />
-              {NEXT_STATUS[order.status]!.label}
-            </Button>
-          )}
-        </div>
+                }}
+                className={item}
+              >
+                <Play className="h-4 w-4" />
+                Alterar status
+              </button>
+              <button
+                type="button"
+                onClick={() => handleEdit(order)}
+                disabled={order.status === 'FINISHED' || order.status === 'PAID'}
+                className={item}
+              >
+                <Edit2 className="h-4 w-4" />
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteConfirm(order.id)
+                  setOpenActionsId(null)
+                }}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Excluir
+              </button>
+            </div>
+          </>
+        )}
       </div>
     )
   }
@@ -451,120 +435,63 @@ export default function OrdersPage() {
         />
       ) : (
         <>
-          {/* Mobile Card View */}
-          <div className="lg:hidden space-y-3">
-            {orders.map((order) => (
-              <OrderCard key={order.id} order={order} />
-            ))}
-          </div>
-
-          {/* Desktop Table View */}
-          <div className="hidden lg:block bg-white rounded-lg shadow overflow-hidden">
+          {/* Tabela (todas as larguras): clicar na linha abre o detalhe da OS */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Número</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Equipamentos</TableHead>
+                  <TableHead>Equipamento</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead className="w-12">
+                    <span className="sr-only">Ações</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {orders.map((order) => {
                   const statusConfig = STATUS_CONFIG[order.status]
                   const StatusIcon = statusConfig.icon
+                  const names = orderEquipmentNames(order.services)
                   return (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-mono font-medium">
-                        #{order.orderNumber}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{order.client.name}</p>
-                          <p className="text-sm text-gray-500">{order.client.phone}</p>
-                        </div>
+                    <TableRow
+                      key={order.id}
+                      tabIndex={0}
+                      onClick={() => handleView(order)}
+                      onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          handleView(order)
+                        }
+                      }}
+                      title={`Abrir OS #${order.orderNumber}`}
+                      className="cursor-pointer hover:bg-blue-50/60 focus:outline-none focus-visible:bg-blue-50"
+                    >
+                      <TableCell className="whitespace-nowrap">
+                        <p className="font-medium text-gray-900">{order.client.name}</p>
+                        <p className="text-xs sm:text-sm text-gray-500">{order.client.phone}</p>
                       </TableCell>
                       <TableCell className="max-w-[220px]">
-                        {(() => {
-                          const names = orderEquipmentNames(order.services)
-                          return (
-                            <span
-                              className={names.length ? 'text-sm text-gray-800' : 'text-gray-400'}
-                              title={names.join(', ') || undefined}
-                            >
-                              {summarizeNames(names)}
-                            </span>
-                          )
-                        })()}
+                        <span
+                          className={`block truncate ${names.length ? 'text-sm text-gray-800' : 'text-gray-400'}`}
+                          title={names.join(', ') || undefined}
+                        >
+                          {summarizeNames(names)}
+                        </span>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setStatusChangeOrder(order)}
-                            className="inline-flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
-                            title="Clique para alterar status"
-                          >
-                            <Badge variant={statusConfig.variant}>
-                              <StatusIcon className="h-3 w-3 mr-1" />
-                              {statusConfig.label}
-                            </Badge>
-                          </button>
-                          {NEXT_STATUS[order.status] && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                if (NEXT_STATUS[order.status]!.status === 'PAUSED') {
-                                  setStatusChangeOrder(order)
-                                } else {
-                                  handleStatusChange(order.id, NEXT_STATUS[order.status]!.status)
-                                }
-                              }}
-                              disabled={updateStatusMutation.isPending}
-                              className="text-xs px-2 py-1 h-auto"
-                              title={`Avançar para ${NEXT_STATUS[order.status]!.label}`}
-                            >
-                              <ArrowRight className="h-3 w-3 mr-1" />
-                              {NEXT_STATUS[order.status]!.label}
-                            </Button>
-                          )}
-                        </div>
+                        <Badge variant={statusConfig.variant} className="whitespace-nowrap">
+                          <StatusIcon className="h-3 w-3 mr-1" />
+                          {statusConfig.label}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="font-semibold text-green-600">
-                        {formatCurrency(order.totalAmount)}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {formatDate(order.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleView(order)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(order)}
-                            disabled={order.status === 'FINISHED' || order.status === 'PAID'}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeleteConfirm(order.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                      <TableCell
+                        className="text-right py-1 pr-2"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <OrderActions order={order} />
                       </TableCell>
                     </TableRow>
                   )
