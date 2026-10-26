@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Plus, Edit2, Trash2, Eye, ClipboardList, Play, CheckCircle, ArrowRight, Calendar, X, DollarSign, Inbox, Pause, MoreVertical, Wrench } from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, ClipboardList, Play, CheckCircle, ArrowRight, Calendar, X, DollarSign, Inbox, Pause, Wrench } from 'lucide-react'
 import { Button, Input, Modal, Badge, EmptyState, Select, Textarea, Pagination } from '@/components/ui'
 import { usePageState, useClampPage } from '@/hooks/use-pagination'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui'
@@ -124,7 +124,6 @@ export default function OrdersPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [statusChangeOrder, setStatusChangeOrder] = useState<Order | null>(null)
   const [pausedReason, setPausedReason] = useState('')
-  const [openActionsId, setOpenActionsId] = useState<string | null>(null)
 
   // Calcular datas baseado no período selecionado
   const dateFilters = useMemo(() => {
@@ -159,12 +158,10 @@ export default function OrdersPage() {
   const handleEdit = (order: Order) => {
     setSelectedOrder(order)
     setIsModalOpen(true)
-    setOpenActionsId(null)
   }
 
   const handleView = (order: Order) => {
     setViewOrder(order)
-    setOpenActionsId(null)
   }
 
   const handleDelete = async (id: string) => {
@@ -224,84 +221,6 @@ export default function OrdersPage() {
     }
   }
 
-  // Menu de ações da linha (⋮). Fica fora do clique da linha: o <td> que o contém
-  // interrompe a propagação para não abrir o detalhe junto.
-  const OrderActions = ({ order }: { order: Order }) => {
-    const next = NEXT_STATUS[order.status]
-    const isOpen = openActionsId === order.id
-    const item =
-      'w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed'
-
-    return (
-      <div className="relative inline-block">
-        <button
-          type="button"
-          onClick={() => setOpenActionsId(isOpen ? null : order.id)}
-          className="p-2 hover:bg-gray-100 rounded-lg"
-          aria-label={`Ações da OS #${order.orderNumber}`}
-          aria-expanded={isOpen}
-        >
-          <MoreVertical className="h-5 w-5 text-gray-500" />
-        </button>
-        {isOpen && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setOpenActionsId(null)} />
-            <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border py-1 z-20 min-w-[160px]">
-              <button type="button" onClick={() => handleView(order)} className={item}>
-                <Eye className="h-4 w-4" />
-                Visualizar
-              </button>
-              {next && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpenActionsId(null)
-                    advanceStatus(order)
-                  }}
-                  disabled={updateStatusMutation.isPending}
-                  className={item}
-                >
-                  <ArrowRight className="h-4 w-4" />
-                  {next.label}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setOpenActionsId(null)
-                  setStatusChangeOrder(order)
-                }}
-                className={item}
-              >
-                <Play className="h-4 w-4" />
-                Alterar status
-              </button>
-              <button
-                type="button"
-                onClick={() => handleEdit(order)}
-                disabled={order.status === 'FINISHED' || order.status === 'PAID'}
-                className={item}
-              >
-                <Edit2 className="h-4 w-4" />
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setDeleteConfirm(order.id)
-                  setOpenActionsId(null)
-                }}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
-              >
-                <Trash2 className="h-4 w-4" />
-                Excluir
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -443,9 +362,6 @@ export default function OrdersPage() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Equipamento</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-12">
-                    <span className="sr-only">Ações</span>
-                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -485,13 +401,6 @@ export default function OrdersPage() {
                           <StatusIcon className="h-3 w-3 mr-1" />
                           {statusConfig.label}
                         </Badge>
-                      </TableCell>
-                      <TableCell
-                        className="text-right py-1 pr-2"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                      >
-                        <OrderActions order={order} />
                       </TableCell>
                     </TableRow>
                   )
@@ -638,16 +547,57 @@ export default function OrdersPage() {
               <p>Atualizado em: {formatDate(viewOrder.updatedAt)}</p>
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 border-t pt-4">
+            {/* Ações da OS: no celular empilham de baixo para cima (Editar no topo, Excluir embaixo) */}
+            <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap sm:justify-end gap-2 sm:gap-3 border-t pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteConfirm(viewOrder.id)
+                  setViewOrder(null)
+                }}
+                className="w-full sm:w-auto sm:mr-auto text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
+              </Button>
               <Button variant="outline" onClick={() => setViewOrder(null)} className="w-full sm:w-auto">
                 Fechar
               </Button>
+              {viewOrder.status !== 'PAID' && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setStatusChangeOrder(viewOrder)
+                    setViewOrder(null)
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  Alterar status
+                </Button>
+              )}
+              {NEXT_STATUS[viewOrder.status] && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setViewOrder(null)
+                    advanceStatus(viewOrder)
+                  }}
+                  disabled={updateStatusMutation.isPending}
+                  className="w-full sm:w-auto"
+                >
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  {NEXT_STATUS[viewOrder.status]!.label}
+                </Button>
+              )}
               {viewOrder.status !== 'FINISHED' && viewOrder.status !== 'PAID' && (
-                <Button onClick={() => {
-                  setViewOrder(null)
-                  handleEdit(viewOrder)
-                }} className="w-full sm:w-auto">
+                <Button
+                  onClick={() => {
+                    setViewOrder(null)
+                    handleEdit(viewOrder)
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  <Edit2 className="h-4 w-4 mr-2" />
                   Editar
                 </Button>
               )}
