@@ -5,7 +5,9 @@ import { cn } from '@/lib/utils'
 
 const Table = forwardRef<HTMLTableElement, HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="w-full overflow-auto">
+    // contain-paint: sem isso o Chrome mobile alarga a viewport de layout para caber a
+    // tabela inteira (mesmo com rolagem interna), e os modais (position: fixed) ficam cortados.
+    <div className="w-full overflow-auto contain-paint">
       <table
         ref={ref}
         className={cn('w-full caption-bottom text-sm', className)}
