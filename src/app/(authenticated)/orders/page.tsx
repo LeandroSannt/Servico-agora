@@ -362,6 +362,7 @@ export default function OrdersPage() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Equipamento</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Criada em</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -401,6 +402,9 @@ export default function OrdersPage() {
                           <StatusIcon className="h-3 w-3 mr-1" />
                           {statusConfig.label}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(order.createdAt)}
                       </TableCell>
                     </TableRow>
                   )
