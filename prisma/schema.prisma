@@ -207,8 +207,24 @@ model ServiceOrder {
   services OrderService[]
   packageUsages PackageUsage[]
   products OrderProduct[]
+  photos   OrderPhoto[]
 
   @@map("service_orders")
+}
+
+// Foto do serviço da OS (base64 sem prefixo, já redimensionada no cliente).
+// Nunca vai nas listagens de OS: a UI lista só os ids e lê a imagem pela rota GET.
+model OrderPhoto {
+  id        String       @id @default(cuid())
+  data      String       @db.Text
+  mimeType  String       @map("mime_type")
+  sizeBytes Int          @map("size_bytes")
+  createdAt DateTime     @default(now()) @map("created_at")
+  orderId   String       @map("order_id")
+  order     ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_photos")
 }
 
 enum OrderStatus {
