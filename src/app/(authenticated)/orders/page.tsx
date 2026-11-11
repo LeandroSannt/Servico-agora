@@ -6,6 +6,7 @@ import { Button, Input, Modal, Badge, EmptyState, Select, Textarea, Pagination }
 import { usePageState, useClampPage } from '@/hooks/use-pagination'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui'
 import OrderForm from '@/components/forms/OrderForm'
+import OrderPhotos from '@/components/orders/OrderPhotos'
 import { useOrders, useDeleteOrder, useUpdateOrderStatus } from '@/hooks/api'
 import ScopeFilter, { type ScopeValue } from '@/components/layout/ScopeFilter'
 import { orderEquipmentNames, summarizeNames } from '@/lib/equipments/order-equipments'
@@ -544,6 +545,11 @@ export default function OrdersPage() {
                 </div>
               </div>
             )}
+
+            {/* Fotos do serviço: disponíveis em qualquer status (inclusive finalizada/paga) */}
+            <div className="border-t pt-4">
+              <OrderPhotos orderId={viewOrder.id} />
+            </div>
 
             {/* Dates */}
             <div className="border-t pt-4 text-xs sm:text-sm text-gray-600 space-y-1">
