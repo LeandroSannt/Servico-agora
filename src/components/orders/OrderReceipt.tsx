@@ -7,6 +7,8 @@ import { buildReceiptLines, receiptSubtotal, type ReceiptServiceInput, type Rece
 import { orderEquipmentNames } from '@/lib/equipments/order-equipments'
 
 interface OrderReceiptProps {
+  /** Página pública: esconde o telefone do cliente (o link pode ser repassado). */
+  hideClientPhone?: boolean
   order: {
     orderNumber: string
     description: string | null
@@ -33,11 +35,12 @@ const brl = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 
 const shortDate = (date: string) =>
-  new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  // Fuso fixo: a página pública renderiza no servidor (UTC) e hidrata no celular do cliente
+  new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'America/Sao_Paulo' })
 
 const BAR = 'bg-blue-600 text-white font-bold uppercase tracking-wide'
 
-export default function OrderReceipt({ order }: OrderReceiptProps) {
+export default function OrderReceipt({ order, hideClientPhone = false }: OrderReceiptProps) {
   const lines = buildReceiptLines(order.services, order.products ?? [])
   const subtotal = receiptSubtotal(lines)
   const total = Number(order.totalAmount)
@@ -54,12 +57,12 @@ export default function OrderReceipt({ order }: OrderReceiptProps) {
       </div>
 
       {/* Cabeçalho: cliente, contato, equipamento, data */}
-      <div className="grid grid-cols-[1fr_auto] divide-x divide-gray-200 border-b border-gray-200">
+      <div className={`grid ${hideClientPhone ? 'grid-cols-1' : 'grid-cols-[1fr_auto] divide-x divide-gray-200'} border-b border-gray-200`}>
         <p className="min-w-0 px-2 py-1.5">
           <span className="font-semibold text-gray-900">Cliente: </span>
           <span className="font-bold uppercase text-gray-900">{order.client.name}</span>
         </p>
-        <p className="whitespace-nowrap px-2 py-1.5 text-gray-700">{order.client.phone}</p>
+        {!hideClientPhone && <p className="whitespace-nowrap px-2 py-1.5 text-gray-700">{order.client.phone}</p>}
       </div>
       <div className="grid grid-cols-[1fr_auto] divide-x divide-gray-200 border-b border-gray-200">
         <p className="min-w-0 px-2 py-1.5 text-gray-700">

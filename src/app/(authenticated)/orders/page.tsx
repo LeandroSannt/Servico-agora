@@ -8,6 +8,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import OrderForm from '@/components/forms/OrderForm'
 import OrderPhotos from '@/components/orders/OrderPhotos'
 import OrderReceipt from '@/components/orders/OrderReceipt'
+import OrderShareLink from '@/components/orders/OrderShareLink'
 import { useOrders, useDeleteOrder, useUpdateOrderStatus } from '@/hooks/api'
 import ScopeFilter, { type ScopeValue } from '@/components/layout/ScopeFilter'
 import { orderEquipmentNames, summarizeNames } from '@/lib/equipments/order-equipments'
@@ -444,6 +445,15 @@ export default function OrdersPage() {
           <div className="space-y-4 sm:space-y-6">
             {/* Comprovante no estilo da planilha: cabe numa tela de celular para print ao cliente */}
             <OrderReceipt order={viewOrder} />
+
+            {/* Link público: o cliente acompanha andamento, valores e fotos sem login */}
+            <OrderShareLink
+              key={viewOrder.id}
+              orderId={viewOrder.id}
+              orderNumber={viewOrder.orderNumber}
+              clientName={viewOrder.client.name}
+              clientPhone={viewOrder.client.phone}
+            />
 
             {/* Ações da OS: no celular empilham de baixo para cima (Editar no topo, Excluir embaixo) */}
             <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap sm:justify-end gap-2 sm:gap-3 border-t pt-4">

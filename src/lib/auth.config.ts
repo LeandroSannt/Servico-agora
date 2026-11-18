@@ -45,7 +45,8 @@ export const authConfig: NextAuthConfig = {
     },
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user
-      const isPublicRoute = ['/login', '/api/auth'].some((route) =>
+      // /os/ e /api/public/: página da OS compartilhada com o cliente (o token do link autoriza)
+      const isPublicRoute = ['/login', '/api/auth', '/os/', '/api/public/'].some((route) =>
         nextUrl.pathname.startsWith(route)
       )
 
