@@ -183,6 +183,9 @@ model ServiceOrder {
   // Snapshot do VIP do cliente ao criar a OS; total gravado = 0 e fora da receita
   isVipOrder  Boolean @default(false) @map("is_vip_order")
 
+  // Link público do detalhe para o cliente (/os/<token>); gerado ao compartilhar
+  publicToken String? @unique @map("public_token")
+
   // Datas
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
