@@ -445,17 +445,6 @@ export default function OrdersPage() {
             {/* Comprovante no estilo da planilha: cabe numa tela de celular para print ao cliente */}
             <OrderReceipt order={viewOrder} />
 
-            {/* Fotos do serviço: disponíveis em qualquer status (inclusive finalizada/paga) */}
-            <div className="border-t pt-4">
-              <OrderPhotos orderId={viewOrder.id} />
-            </div>
-
-            {/* Dates */}
-            <div className="border-t pt-4 text-xs sm:text-sm text-gray-600 space-y-1">
-              <p>Criado em: {formatDate(viewOrder.createdAt)}</p>
-              <p>Atualizado em: {formatDate(viewOrder.updatedAt)}</p>
-            </div>
-
             {/* Ações da OS: no celular empilham de baixo para cima (Editar no topo, Excluir embaixo) */}
             <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap sm:justify-end gap-2 sm:gap-3 border-t pt-4">
               <Button
@@ -510,6 +499,17 @@ export default function OrdersPage() {
                   Editar
                 </Button>
               )}
+            </div>
+
+            {/* Fotos do serviço: disponíveis em qualquer status (inclusive finalizada/paga) */}
+            <div className="border-t pt-4">
+              <OrderPhotos orderId={viewOrder.id} />
+            </div>
+
+            {/* Dates */}
+            <div className="border-t pt-4 text-xs sm:text-sm text-gray-600 space-y-1">
+              <p>Criado em: {formatDate(viewOrder.createdAt)}</p>
+              <p>Atualizado em: {formatDate(viewOrder.updatedAt)}</p>
             </div>
           </div>
         )}
