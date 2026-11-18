@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Plus, Edit2, Trash2, ClipboardList, Play, CheckCircle, ArrowRight, Calendar, X, DollarSign, Inbox, Pause, Wrench } from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, ClipboardList, Play, CheckCircle, ArrowRight, Calendar, X, DollarSign, Inbox, Pause } from 'lucide-react'
 import { Button, Input, Modal, Badge, EmptyState, Select, Textarea, Pagination } from '@/components/ui'
 import { usePageState, useClampPage } from '@/hooks/use-pagination'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui'
 import OrderForm from '@/components/forms/OrderForm'
 import OrderPhotos from '@/components/orders/OrderPhotos'
+import OrderReceipt from '@/components/orders/OrderReceipt'
 import { useOrders, useDeleteOrder, useUpdateOrderStatus } from '@/hooks/api'
 import ScopeFilter, { type ScopeValue } from '@/components/layout/ScopeFilter'
 import { orderEquipmentNames, summarizeNames } from '@/lib/equipments/order-equipments'
@@ -29,6 +30,7 @@ interface Order {
   description: string | null
   status: 'RECEIVED' | 'IN_PROGRESS' | 'PAUSED' | 'FINISHED' | 'PAID'
   totalAmount: number
+  isVipOrder?: boolean
   client: { id: string; name: string; phone: string; email: string | null }
   store: { id: string; name: string }
   services: OrderService[]
@@ -193,13 +195,6 @@ export default function OrdersPage() {
   const handleSuccess = () => {
     setIsModalOpen(false)
     setSelectedOrder(null)
-  }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value)
   }
 
   const formatDate = (date: string) => {
@@ -447,104 +442,8 @@ export default function OrdersPage() {
       >
         {viewOrder && (
           <div className="space-y-4 sm:space-y-6">
-            {/* Status */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">Status</p>
-                <Badge variant={STATUS_CONFIG[viewOrder.status].variant} className="mt-1">
-                  {STATUS_CONFIG[viewOrder.status].label}
-                </Badge>
-              </div>
-              <div className="sm:text-right">
-                <p className="text-xs sm:text-sm text-gray-500">Total</p>
-                <p className="text-xl sm:text-2xl font-bold text-green-600">
-                  {formatCurrency(viewOrder.totalAmount)}
-                </p>
-              </div>
-            </div>
-
-            {/* Client Info */}
-            <div className="border-t pt-4">
-              <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Cliente</h4>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="font-medium text-sm sm:text-base text-gray-900">{viewOrder.client.name}</p>
-                <p className="text-xs sm:text-sm text-gray-700">{viewOrder.client.phone}</p>
-                {viewOrder.client.email && (
-                  <p className="text-xs sm:text-sm text-gray-700">{viewOrder.client.email}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Description */}
-            {viewOrder.description && (
-              <div className="border-t pt-4">
-                <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Descrição</h4>
-                <p className="text-sm text-gray-800 bg-gray-50 p-3 rounded-lg">
-                  {viewOrder.description}
-                </p>
-              </div>
-            )}
-
-            {/* Services */}
-            {viewOrder.services.length > 0 && (
-            <div className="border-t pt-4">
-              <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Serviços</h4>
-              <div className="space-y-2">
-                {viewOrder.services.map((service) => (
-                  <div
-                    key={service.id}
-                    className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-gray-50 p-3 rounded-lg gap-1 sm:gap-4"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm sm:text-base text-gray-900 truncate">
-                        {service.serviceName}
-                        {service.packageUsage && <span className="ml-1 text-xs text-blue-600">(pacote)</span>}
-                      </p>
-                      {service.description && (
-                        <p className="text-xs sm:text-sm text-gray-700 truncate">{service.description}</p>
-                      )}
-                      {(service.equipments?.length ?? 0) > 0 && (
-                        <p className="flex items-center gap-1 text-xs text-gray-600 mt-0.5">
-                          <Wrench className="h-3 w-3 shrink-0" />
-                          Equipamentos: {service.equipments!.map((e) => e.equipment.name).join(', ')}
-                        </p>
-                      )}
-                    </div>
-                    <div className="sm:text-right flex sm:flex-col justify-between sm:justify-end items-center sm:items-end">
-                      <p className="text-xs sm:text-sm text-gray-700">
-                        {formatCurrency(service.price)} x {service.quantity}
-                      </p>
-                      <p className="font-semibold text-green-600 text-sm sm:text-base">
-                        {formatCurrency(service.price * service.quantity)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            )}
-
-            {/* Products */}
-            {(viewOrder.products?.length ?? 0) > 0 && (
-              <div className="border-t pt-4">
-                <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Produtos</h4>
-                <div className="space-y-2">
-                  {viewOrder.products!.map((p) => (
-                    <div key={p.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg gap-4">
-                      <p className="min-w-0 font-medium text-sm sm:text-base text-gray-900 truncate">{p.name}</p>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs sm:text-sm text-gray-700">
-                          {formatCurrency(Number(p.unitPrice))} x {p.quantity}
-                        </p>
-                        <p className="font-semibold text-green-600 text-sm sm:text-base">
-                          {formatCurrency(Number(p.unitPrice) * p.quantity)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Comprovante no estilo da planilha: cabe numa tela de celular para print ao cliente */}
+            <OrderReceipt order={viewOrder} />
 
             {/* Fotos do serviço: disponíveis em qualquer status (inclusive finalizada/paga) */}
             <div className="border-t pt-4">
